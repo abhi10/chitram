@@ -1,0 +1,147 @@
+"""API tests for image endpoints."""
+
+import pytest
+from httpx import AsyncClient
+
+
+class TestUploadImage:
+    """Tests for POST /api/v1/images/upload."""
+
+    async def test_upload_valid_jpeg(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+        """Uploading a valid JPEG returns 201 with metadata."""
+        response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert "id" in data
+        assert data["filename"] == "test.jpg"
+        assert data["content_type"] == "image/jpeg"
+        assert data["file_size"] == len(sample_jpeg_bytes)
+        assert "url" in data
+
+    async def test_upload_valid_png(self, client: AsyncClient, sample_png_bytes: bytes):
+        """Uploading a valid PNG returns 201 with metadata."""
+        response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.png", sample_png_bytes, "image/png")},
+        )
+
+        assert response.status_code == 201
+        data = response.json()
+        assert data["content_type"] == "image/png"
+
+    async def test_upload_invalid_file_type(self, client: AsyncClient, invalid_file_bytes: bytes):
+        """Uploading a non-image returns 400 with error."""
+        response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.txt", invalid_file_bytes, "text/plain")},
+        )
+
+        assert response.status_code == 400
+        data = response.json()
+        assert data["error"]["code"] == "INVALID_FILE_FORMAT"
+
+    async def test_upload_no_file(self, client: AsyncClient):
+        """Uploading without a file returns 422."""
+        response = await client.post("/api/v1/images/upload")
+
+        assert response.status_code == 422
+
+
+class TestGetImageMetadata:
+    """Tests for GET /api/v1/images/{image_id}."""
+
+    async def test_get_existing_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+        """Getting metadata for existing image returns 200."""
+        # Upload first
+        upload_response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+        )
+        image_id = upload_response.json()["id"]
+
+        # Get metadata
+        response = await client.get(f"/api/v1/images/{image_id}")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == image_id
+        assert data["filename"] == "test.jpg"
+
+    async def test_get_nonexistent_image(self, client: AsyncClient):
+        """Getting metadata for nonexistent image returns 404."""
+        response = await client.get("/api/v1/images/nonexistent-id")
+
+        assert response.status_code == 404
+        data = response.json()
+        assert data["error"]["code"] == "IMAGE_NOT_FOUND"
+
+
+class TestDownloadImage:
+    """Tests for GET /api/v1/images/{image_id}/file."""
+
+    async def test_download_existing_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+        """Downloading existing image returns file content."""
+        # Upload first
+        upload_response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+        )
+        image_id = upload_response.json()["id"]
+
+        # Download
+        response = await client.get(f"/api/v1/images/{image_id}/file")
+
+        assert response.status_code == 200
+        assert response.headers["content-type"] == "image/jpeg"
+        assert len(response.content) == len(sample_jpeg_bytes)
+
+    async def test_download_nonexistent_image(self, client: AsyncClient):
+        """Downloading nonexistent image returns 404."""
+        response = await client.get("/api/v1/images/nonexistent-id/file")
+
+        assert response.status_code == 404
+
+
+class TestDeleteImage:
+    """Tests for DELETE /api/v1/images/{image_id}."""
+
+    async def test_delete_existing_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+        """Deleting existing image returns 204."""
+        # Upload first
+        upload_response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+        )
+        image_id = upload_response.json()["id"]
+
+        # Delete
+        response = await client.delete(f"/api/v1/images/{image_id}")
+
+        assert response.status_code == 204
+
+        # Verify deleted
+        get_response = await client.get(f"/api/v1/images/{image_id}")
+        assert get_response.status_code == 404
+
+    async def test_delete_nonexistent_image(self, client: AsyncClient):
+        """Deleting nonexistent image returns 404."""
+        response = await client.delete("/api/v1/images/nonexistent-id")
+
+        assert response.status_code == 404
+
+
+class TestHealthCheck:
+    """Tests for GET /health."""
+
+    async def test_health_check(self, client: AsyncClient):
+        """Health check returns status info."""
+        response = await client.get("/health")
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "status" in data
+        assert "version" in data
