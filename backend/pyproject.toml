@@ -34,6 +34,7 @@ dev = [
     "pytest-asyncio>=0.24.0",
     "pytest-cov>=6.0.0",
     "aiosqlite>=0.20.0",
+    "pillow>=11.0.0",         # For generating test images
 
     # Code Quality
     "ruff>=0.8.0",
@@ -46,7 +47,6 @@ dev = [
 
 # Optional dependencies for future phases
 future = [
-    "pillow>=11.0.0",         # Phase 1.5: Image dimensions
     "minio>=7.2.0",           # Phase 2: Production storage
     "python-magic>=0.4.27",   # Phase 2: Advanced validation
 ]
