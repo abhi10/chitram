@@ -8,7 +8,7 @@ class TestUploadImage:
     """Tests for POST /api/v1/images/upload."""
 
     async def test_upload_valid_jpeg(self, client: AsyncClient, sample_jpeg_bytes: bytes):
-        """Uploading a valid JPEG returns 201 with metadata."""
+        """Uploading a valid JPEG returns 201 with metadata including dimensions."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
@@ -21,9 +21,12 @@ class TestUploadImage:
         assert data["content_type"] == "image/jpeg"
         assert data["file_size"] == len(sample_jpeg_bytes)
         assert "url" in data
+        # Phase 1.5: Image dimensions
+        assert data["width"] == 100  # Test fixture creates 100x100 image
+        assert data["height"] == 100
 
     async def test_upload_valid_png(self, client: AsyncClient, sample_png_bytes: bytes):
-        """Uploading a valid PNG returns 201 with metadata."""
+        """Uploading a valid PNG returns 201 with metadata including dimensions."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.png", sample_png_bytes, "image/png")},
@@ -32,6 +35,9 @@ class TestUploadImage:
         assert response.status_code == 201
         data = response.json()
         assert data["content_type"] == "image/png"
+        # Phase 1.5: Image dimensions
+        assert data["width"] == 100  # Test fixture creates 100x100 image
+        assert data["height"] == 100
 
     async def test_upload_invalid_file_type(self, client: AsyncClient, invalid_file_bytes: bytes):
         """Uploading a non-image returns 400 with error."""
@@ -56,7 +62,7 @@ class TestGetImageMetadata:
     """Tests for GET /api/v1/images/{image_id}."""
 
     async def test_get_existing_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
-        """Getting metadata for existing image returns 200."""
+        """Getting metadata for existing image returns 200 with dimensions."""
         # Upload first
         upload_response = await client.post(
             "/api/v1/images/upload",
@@ -71,6 +77,9 @@ class TestGetImageMetadata:
         data = response.json()
         assert data["id"] == image_id
         assert data["filename"] == "test.jpg"
+        # Phase 1.5: Image dimensions
+        assert data["width"] == 100
+        assert data["height"] == 100
 
     async def test_get_nonexistent_image(self, client: AsyncClient):
         """Getting metadata for nonexistent image returns 404."""

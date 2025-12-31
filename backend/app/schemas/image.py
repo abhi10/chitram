@@ -30,6 +30,9 @@ class ImageMetadata(BaseModel):
     content_type: str
     file_size: int
     created_at: datetime
+    # Phase 1.5: Image dimensions (optional for backward compatibility)
+    width: int | None = None
+    height: int | None = None
 
 
 class ImageResponse(ImageMetadata):
@@ -47,3 +50,6 @@ class ImageUploadResponse(BaseModel):
     file_size: int
     url: str
     created_at: datetime
+    # Phase 1.5: Image dimensions (optional for backward compatibility)
+    width: int | None = None
+    height: int | None = None
