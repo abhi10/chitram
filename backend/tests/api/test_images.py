@@ -42,7 +42,8 @@ class TestUploadImage:
 
         assert response.status_code == 400
         data = response.json()
-        assert data["error"]["code"] == "INVALID_FILE_FORMAT"
+        # FastAPI HTTPException uses "detail" key
+        assert data["detail"]["code"] == "INVALID_FILE_FORMAT"
 
     async def test_upload_no_file(self, client: AsyncClient):
         """Uploading without a file returns 422."""
@@ -77,7 +78,8 @@ class TestGetImageMetadata:
 
         assert response.status_code == 404
         data = response.json()
-        assert data["error"]["code"] == "IMAGE_NOT_FOUND"
+        # FastAPI HTTPException uses "detail" key
+        assert data["detail"]["code"] == "IMAGE_NOT_FOUND"
 
 
 class TestDownloadImage:
