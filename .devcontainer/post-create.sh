@@ -23,6 +23,21 @@ else
     echo "✅ PostgreSQL is ready!"
 fi
 
+# Wait for MinIO to be ready (with timeout)
+echo "⏳ Waiting for MinIO..."
+RETRIES=30
+until curl -sf http://minio:9000/minio/health/live > /dev/null 2>&1 || [ $RETRIES -eq 0 ]; do
+    echo "   Waiting for MinIO... ($RETRIES retries left)"
+    RETRIES=$((RETRIES-1))
+    sleep 2
+done
+
+if [ $RETRIES -eq 0 ]; then
+    echo "⚠️  MinIO not ready, continuing anyway..."
+else
+    echo "✅ MinIO is ready!"
+fi
+
 # Create .env if it doesn't exist
 if [ ! -f backend/.env ]; then
     echo "📝 Creating .env file..."
@@ -45,16 +60,17 @@ echo "========================================="
 echo "✅ Development environment ready!"
 echo "========================================="
 echo ""
-echo "📍 Phase 1 Lean - Local Storage Only"
+echo "📍 Phase 2 - MinIO Storage Backend"
 echo ""
 echo "📍 Services:"
 echo "   FastAPI:        http://localhost:8000"
 echo "   API Docs:       http://localhost:8000/docs"
 echo "   PostgreSQL:     localhost:5432"
+echo "   MinIO API:      http://localhost:9000"
+echo "   MinIO Console:  http://localhost:9001"
 echo ""
 echo "🚀 Start the app:"
 echo "   cd backend && uv run uvicorn app.main:app --reload --host 0.0.0.0"
 echo ""
-echo "📝 Note: MinIO removed in Phase 1 Lean (ADR-0008)"
-echo "         Will be restored in Phase 2"
+echo "📝 MinIO credentials: minioadmin / minioadmin"
 echo ""
