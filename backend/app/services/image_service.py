@@ -1,7 +1,9 @@
 """Image service - business logic layer."""
 
+import io
 import uuid
 
+from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -34,6 +36,25 @@ class ImageService:
             sanitized = f"{name[:250]}.{ext}" if ext else name[:255]
         return sanitized or "unnamed"
 
+    @staticmethod
+    def get_image_dimensions(data: bytes) -> tuple[int, int] | None:
+        """
+        Extract image dimensions using Pillow.
+
+        Args:
+            data: Raw image bytes
+
+        Returns:
+            Tuple of (width, height) or None if extraction fails
+        """
+        try:
+            with PILImage.open(io.BytesIO(data)) as img:
+                return img.size  # Returns (width, height)
+        except Exception:
+            # If Pillow can't read the image, return None
+            # This gracefully handles edge cases without failing the upload
+            return None
+
     async def upload(
         self,
         data: bytes,
@@ -57,6 +78,10 @@ class ImageService:
         safe_filename = self.sanitize_filename(filename)
         storage_key = self.generate_storage_key(safe_filename)
 
+        # Extract image dimensions (Phase 1.5)
+        dimensions = self.get_image_dimensions(data)
+        width, height = dimensions if dimensions else (None, None)
+
         # Save to storage
         await self.storage.save(storage_key, data, content_type)
 
@@ -67,6 +92,8 @@ class ImageService:
             content_type=content_type,
             file_size=len(data),
             upload_ip=upload_ip,
+            width=width,
+            height=height,
         )
 
         self.db.add(image)

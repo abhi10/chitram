@@ -1,8 +1,8 @@
 # Chitram - TODO List & Progress Tracker
 
 **Repository:** https://github.com/abhi10/chitram
-**Current Phase:** Phase 1 Lean ✅ (Code Complete, Validation Pending)
-**Last Updated:** 2025-12-20
+**Current Phase:** Phase 1.5 (Image Dimensions)
+**Last Updated:** 2025-12-25
 
 ---
 
@@ -10,18 +10,19 @@
 
 | Phase | Status | Branch | Duration | Notes |
 |-------|--------|--------|----------|-------|
-| **Phase 1 Lean** | ✅ Code Complete | `main` | 2-3 days | Testing pending |
-| **Phase 1.5** | ⏸️ Pending | `feature/phase-1.5` | 4-6 hours | Add dimensions |
+| **Phase 1 Lean** | ✅ Complete | `main` | 2-3 days | Validated 2025-12-24 |
+| **Phase 1.5** | 🟡 In Progress | `phase1-5` | 4-6 hours | Add dimensions + Alembic |
 | **Phase 2** | ⏸️ Pending | `feature/phase-2` | 1-2 weeks | Full features |
 | **Phase 3** | ⏸️ Pending | `feature/phase-3` | 2-3 weeks | Scaling |
 | **Phase 4** | ⏸️ Pending | `feature/phase-4` | 1 week | Observability |
+| **UI Layer** | 📋 Planning | `chitram-web` | TBD | Optional frontend (after Phase 2) |
 
 ---
 
-## ✅ Phase 1 Lean - Foundation (CURRENT)
+## ✅ Phase 1 Lean - Foundation (COMPLETE)
 
 **Goal:** Validate core CRUD operations with minimal complexity
-**Status:** 🟡 Code complete, validation pending
+**Status:** ✅ Complete - Validated 2025-12-24
 
 ### Code Implementation
 - [x] FastAPI application structure
@@ -37,68 +38,69 @@
 - [x] Code review (99% score)
 - [x] Documentation complete
 
-### Validation & Testing (IN PROGRESS)
-- [ ] **Install dependencies** - `cd backend && uv sync`
-- [ ] **Setup Alembic** - Initialize migrations
-- [ ] **Create initial migration** - 7-column schema
-- [ ] **Test in Codespaces** - Validate DevContainer
-- [ ] **Run validation checklist** - See `docs/validation-checklist.md`
-  - [ ] Import validation (all modules load)
-  - [ ] Database connection test
-  - [ ] Storage service test
-  - [ ] API tests pass
-  - [ ] Manual testing via Swagger UI
-  - [ ] Error scenarios verified
-- [ ] **Create validation session log** - Document findings
-- [ ] **Tag release** - `git tag v0.1.0-phase1`
+### Validation & Testing (COMPLETE)
+- [x] **Install dependencies** - `cd backend && uv sync`
+- [x] **Test in Codespaces** - Validated DevContainer
+- [x] **Run validation checklist** - See `docs/PHASE1_TESTING.md`
+  - [x] Import validation (all modules load)
+  - [x] Database connection test (SQLite in-memory)
+  - [x] Storage service test (local filesystem)
+  - [x] Manual testing via Swagger UI
+  - [x] Error scenarios verified (invalid file type, missing file)
+- [x] **Create validation session log** - `docs/PHASE1_TESTING.md`
+- [x] **Docs cleanup** - Reorganized into architecture/, learning/, testing/, archive/
 
 **Branch:** `main`
-**Time Estimate:** 2-4 hours validation
-**Blockers:** None
+**Completed:** 2025-12-24
 
-**Next Step:** Run validation checklist in Codespaces
+**Note:** Alembic setup and API tests moved to Phase 1.5
 
 ---
 
-## 🔜 Phase 1.5 - Image Dimensions (NEXT)
+## 🟡 Phase 1.5 - Image Dimensions + Alembic (CURRENT)
 
-**Goal:** Add image dimension extraction without architectural changes
-**Status:** ⏸️ Not started
-**Prerequisites:** Phase 1 Lean fully validated
+**Goal:** Add Alembic migrations, image dimensions, and run API tests
+**Status:** 🟡 In Progress
+**Prerequisites:** Phase 1 Lean validated ✅
 
-### Implementation Checklist
-- [ ] **Create feature branch** - `git checkout -b feature/phase-1.5`
-- [ ] **Add Pillow dependency** - Update `pyproject.toml`
-- [ ] **Run** `uv sync`
-- [ ] **Setup Alembic** (if not done in Phase 1)
-- [ ] **Create migration** - `alembic revision -m "Add width and height columns"`
-- [ ] **Update migration file** - Add width, height columns (nullable)
+### Database Migrations (From Phase 1)
+- [ ] **Setup Alembic** - Initialize migrations
+- [ ] **Create initial migration** - 7-column schema (id, filename, content_type, file_size, storage_key, upload_ip, created_at)
 - [ ] **Run migration** - `alembic upgrade head`
-- [ ] **Restore code:**
-  - [ ] Add `get_image_dimensions()` method to `image_service.py`
-  - [ ] Add width/height to `Image` model
-  - [ ] Add width/height to schemas (ImageMetadata, ImageUploadResponse)
-  - [ ] Update API response construction
+- [ ] **Create second migration** - Add width, height columns (nullable)
+
+### Pillow Integration
+- [x] **Pillow dependency** - Already in dev deps (moved in cleanup)
+- [ ] **Run** `uv sync --all-extras` to install Pillow
+- [ ] **Add `get_image_dimensions()` method** to `image_service.py`
+- [ ] **Add width/height to `Image` model**
+- [ ] **Add width/height to schemas** (ImageMetadata, ImageUploadResponse)
+- [ ] **Update API response construction**
+
+### Testing
+- [ ] **Run API tests** - `uv run pytest tests/api -v`
 - [ ] **Update tests** - Add width/height assertions
 - [ ] **Test migration:**
   - [ ] Test on fresh database
   - [ ] Test on database with existing images
   - [ ] Verify NULL handling for old images
 - [ ] **Validate all endpoints** - Ensure Phase 1 functionality preserved
+
+### Finalize
 - [ ] **Update documentation:**
   - [ ] Changelog
   - [ ] Code review checklist
   - [ ] Session log
-- [ ] **Commit changes** - `git commit -m "feat: add image dimensions with Pillow"`
-- [ ] **Push branch** - `git push -u origin feature/phase-1.5`
+- [ ] **Commit changes** - `git commit -m "feat: add Alembic migrations and image dimensions"`
+- [ ] **Push branch** - `git push -u origin phase1-5`
 - [ ] **Merge to main** - After validation
 - [ ] **Tag release** - `git tag v0.1.5`
 
-**Branch:** `feature/phase-1.5` (to be created)
+**Branch:** `phase1-5`
 **Time Estimate:** 4-6 hours
-**Blockers:** Phase 1 Lean validation
+**Blockers:** None
 
-**Reference:** `docs/phase-execution-plan.md` lines 101-171
+**Reference:** `docs/architecture/phase-1-foundation.md`
 
 ---
 
@@ -126,6 +128,10 @@
   - [ ] Redis-backed rate limiter
   - [ ] 10 requests/IP/minute
   - [ ] Return 429 with Retry-After header
+- [ ] **Concurrency Control:** (from Graphiti patterns)
+  - [ ] Add `asyncio.Semaphore` for concurrent upload limits
+  - [ ] Prevent file collision on simultaneous uploads
+  - [ ] Configure `SEMAPHORE_LIMIT` in settings
 - [ ] **Testing & Validation:**
   - [ ] All Phase 1 functionality preserved
   - [ ] Storage switching works
@@ -152,6 +158,12 @@
   - [ ] Image optimization task
   - [ ] Checksum calculation
   - [ ] Update docker-compose.yml
+- [ ] **Image Deduplication:**
+  - [ ] Evaluate imagededup library (CNN/hashing-based)
+  - [ ] Store perceptual hash on upload
+  - [ ] Find duplicates endpoint (`GET /images/{id}/duplicates`)
+  - [ ] Optional: Block duplicate uploads
+  - [ ] Reference: https://deepwiki.com/idealo/imagededup/7-usage-examples
 - [ ] **Advanced Validation:**
   - [ ] Restore python-magic library
   - [ ] Better file type detection
@@ -255,10 +267,11 @@
   - [ ] Setup PagerDuty/Slack
   - [ ] Test alert firing
   - [ ] Create runbooks
-- [ ] **Circuit Breakers:**
-  - [ ] Add circuit breaker library
+- [ ] **Circuit Breakers:** (Graphiti pattern)
+  - [ ] Add circuit breaker library (e.g., `aiobreaker`)
+  - [ ] Protect storage operations (fail fast on repeated errors)
   - [ ] Protect external service calls
-  - [ ] Graceful degradation
+  - [ ] Graceful degradation with fallback responses
   - [ ] Retry with exponential backoff
 - [ ] **Health Checks:**
   - [ ] Liveness probe
@@ -278,6 +291,125 @@
 **Blockers:** Phase 3 complete
 
 **Reference:** `docs/phase-execution-plan.md` lines 415-502
+
+---
+
+## 🌐 Future: UI Layer (chitram-web)
+
+**Goal:** Optional web frontend for the Chitram API
+**Status:** 📋 Planning (not started)
+**Prerequisites:** Phase 2 complete (Auth required for user-specific galleries)
+**Repository:** `github.com/abhi10/chitram-web` (to be created)
+
+### Architecture Decision
+
+```
+┌─────────────────────┐         ┌─────────────────────┐
+│    chitram-web      │  HTTP   │      chitram        │
+│    (Frontend)       │────────▶│      (API)          │
+│                     │         │                     │
+│  - Gallery UI       │         │  - REST endpoints   │
+│  - Upload form      │         │  - Auth (JWT)       │
+│  - User dashboard   │         │  - Storage          │
+└─────────────────────┘         └─────────────────────┘
+```
+
+### Option Evaluation
+
+| Option | Stack | Effort | Pros | Cons |
+|--------|-------|--------|------|------|
+| **A: HTMX + Jinja2** | Python (same repo) | ~1 day | No JS build, fast, simple | Limited interactivity |
+| **B: React SPA** | TypeScript, Vite | ~1 week | Rich UX, component ecosystem | Separate build, complexity |
+| **C: Next.js** | TypeScript, React | ~1 week | SSR, SEO, API routes | Node.js runtime needed |
+| **D: FastAPI-Admin** | Python plugin | ~2 hours | Quick admin CRUD | Not user-facing |
+
+**Recommendation:** Start with **Option A (HTMX)** for quick validation, migrate to **Option B/C** if richer UX needed.
+
+### Planned Features (Phase 5+)
+
+- [ ] **Public Pages:**
+  - [ ] Home page with recent uploads
+  - [ ] Image detail page (`/image/{id}`)
+  - [ ] Public gallery view
+- [ ] **User Features (requires Phase 2 Auth):**
+  - [ ] User registration/login
+  - [ ] Personal gallery (`/my-images`)
+  - [ ] Upload form with drag-and-drop
+  - [ ] Batch upload support
+  - [ ] Image management (delete, visibility toggle)
+- [ ] **Admin Features:**
+  - [ ] Dashboard with stats
+  - [ ] User management
+  - [ ] Storage usage monitoring
+  - [ ] Moderation tools
+- [ ] **UX Enhancements:**
+  - [ ] Responsive design (mobile-first)
+  - [ ] Dark mode toggle
+  - [ ] Image lightbox/preview
+  - [ ] Copy link to clipboard
+  - [ ] Share buttons
+
+### Tech Stack (Option A - HTMX)
+
+```
+chitram-web/ (or chitram/frontend/)
+├── templates/
+│   ├── base.html           # Layout with TailwindCSS
+│   ├── home.html           # Gallery grid
+│   ├── upload.html         # Upload form
+│   ├── image.html          # Image detail
+│   └── partials/           # HTMX fragments
+│       ├── gallery-item.html
+│       └── upload-progress.html
+├── static/
+│   ├── css/
+│   └── js/
+└── routes/
+    └── web.py              # Jinja2 template routes
+```
+
+### Tech Stack (Option B - React)
+
+```
+chitram-web/
+├── src/
+│   ├── components/
+│   │   ├── Gallery.tsx
+│   │   ├── ImageCard.tsx
+│   │   ├── UploadForm.tsx
+│   │   └── Navbar.tsx
+│   ├── pages/
+│   │   ├── Home.tsx
+│   │   ├── Upload.tsx
+│   │   └── Image.tsx
+│   ├── hooks/
+│   │   └── useApi.ts
+│   └── App.tsx
+├── package.json
+└── vite.config.ts
+```
+
+### API Integration Points
+
+| Frontend Action | API Endpoint | Notes |
+|-----------------|--------------|-------|
+| Load gallery | `GET /api/v1/images/` | Paginated list |
+| View image | `GET /api/v1/images/{id}` | Metadata |
+| Display image | `GET /api/v1/images/{id}/file` | Binary stream |
+| Upload | `POST /api/v1/images/upload` | Multipart form |
+| Delete | `DELETE /api/v1/images/{id}` | Requires auth (Phase 2) |
+| Login | `POST /api/v1/auth/login` | Phase 2 |
+| Register | `POST /api/v1/auth/register` | Phase 2 |
+
+### When to Start
+
+```
+Now (Phase 1-2):     API-only, use Swagger UI for testing
+After Phase 2:       Option A (HTMX) for quick demo
+After Phase 3:       Option B/C if production UI needed
+```
+
+**Decision:** Defer until Phase 2 Auth is complete. API-first approach allows any frontend later.
 
 ---
 
@@ -389,16 +521,20 @@ git push origin --delete feature/phase-X.X
 ## 📚 Documentation Reference
 
 ### Essential Documents
-- **Phase Plans:** `docs/phase-execution-plan.md`
-- **Validation:** `docs/validation-checklist.md`
+- **Architecture:** `docs/architecture/BUILDING_BLOCKS.md` - Core DS principles
+- **Phase Details:** `docs/architecture/phase-{1,2,3,4}-*.md`
+- **Learnings:** `docs/learning/LEARNINGS.md` - DS building blocks tracker
+- **Testing:** `docs/testing/TESTING_STRATEGY.md` - Testing approach
+- **Validation:** `docs/PHASE1_TESTING.md` - Phase 1 test results
 - **Code Review:** `docs/code-review-checklist.md`
-- **Architecture:** `image-hosting-mvp-distributed-systems.md`
 - **Requirements:** `requirements.md`
 - **ADRs:** `docs/adr/` (9 decisions documented)
 
-### Session Logs
-- **Phase 1 Lean Execution:** `docs/sessions/2025-12-19-phase1-lean-execution.md`
-- **Next session:** Create validation session log
+### Archived Documents
+- **Archive:** `docs/archive/` - Historical docs preserved for reference
+  - Original 2200-line MVP design doc
+  - Phase execution plan
+  - One-time code reviews
 
 ### Key ADRs
 - **ADR-0008:** Phase 1 Lean approach (defer complexity)
@@ -407,20 +543,27 @@ git push origin --delete feature/phase-X.X
 - **ADR-0005:** Structured error format
 - **ADR-0001:** Use FastAPI framework
 
+### External References
+- **Graphiti Patterns:** https://github.com/getzep/graphiti - Storage abstraction, concurrency control, circuit breakers
+- **Image Deduplication:** https://deepwiki.com/idealo/imagededup/7-usage-examples - Perceptual hashing
+- **System Design Foundation:** Stages 1-5 (Core → Performance → Distributed → Reliability → Advanced)
+
 ---
 
 ## 🎯 Current Focus
 
-**Immediate Next Steps (This Week):**
-1. ✅ Code pushed to GitHub
-2. ⏳ Run validation checklist in Codespaces
-3. ⏳ Setup Alembic migrations
-4. ⏳ Create validation session log
-5. ⏳ Tag Phase 1 Lean release (v0.1.0)
+**Phase 1.5 - In Progress:**
+1. ⏳ Setup Alembic migrations (initial 7-column schema)
+2. ⏳ Add width/height columns migration
+3. ⏳ Implement Pillow integration for dimensions
+4. ⏳ Run and fix API tests
+5. ⏳ Tag Phase 1.5 release (v0.1.5)
 
-**After Validation:**
-- Start Phase 1.5 (image dimensions)
-- Estimated: 4-6 hours work
+**Completed (Phase 1):**
+- ✅ Code pushed to GitHub
+- ✅ Validation in Codespaces complete
+- ✅ Docs cleanup and reorganization
+- ✅ Session log: `docs/PHASE1_TESTING.md`
 
 ---
 
@@ -429,8 +572,8 @@ git push origin --delete feature/phase-X.X
 ```
 Timeline: 8 weeks total (2 months)
 
-Week 1-2:   Phase 1 Lean ✅ (Code complete, validation pending)
-Week 2:     Phase 1.5 ⏸️ (Not started)
+Week 1-2:   Phase 1 Lean ✅ (Complete - Validated 2025-12-24)
+Week 2:     Phase 1.5 🟡 (In Progress)
 Week 3-4:   Phase 2 ⏸️ (Not started)
 Week 5-7:   Phase 3 ⏸️ (Not started)
 Week 8:     Phase 4 ⏸️ (Not started)
@@ -438,7 +581,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 
 **Current Status:** 🟢 On track
 **Blockers:** None
-**Last Updated:** 2025-12-20
+**Last Updated:** 2025-12-25
 
 ---
 
@@ -447,8 +590,9 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2025-12-13:** Project initialized, ADRs created
 - [x] **2025-12-19:** Phase 1 Lean scaffolding complete
 - [x] **2025-12-20:** Code review (99% score), pushed to GitHub
-- [ ] **Next:** Phase 1 Lean validation
-- [ ] **Next:** Phase 1.5 image dimensions
+- [x] **2025-12-24:** Phase 1 Lean validation complete (see `docs/PHASE1_TESTING.md`)
+- [x] **2025-12-24:** Docs cleanup - reorganized into architecture/, learning/, testing/, archive/
+- [ ] **In Progress:** Phase 1.5 - Alembic + image dimensions
 - [ ] **Next:** Phase 2 full features
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability

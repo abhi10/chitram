@@ -95,6 +95,8 @@ async def upload_image(
         file_size=image.file_size,
         url=f"/api/v1/images/{image.id}/file",
         created_at=image.created_at,
+        width=image.width,
+        height=image.height,
     )
 
 

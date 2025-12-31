@@ -39,6 +39,9 @@ class Image(Base):
         default=utc_now,
         nullable=False,
     )
+    # Phase 1.5: Image dimensions (nullable for backward compatibility)
+    width: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    height: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     def __repr__(self) -> str:
         return f"<Image(id={self.id}, filename={self.filename})>"
