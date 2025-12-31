@@ -18,10 +18,17 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+asyncpg://app:localdev@localhost:5432/imagehost"
 
     # Storage Backend
-    storage_backend: str = "local"  # Local filesystem only in Phase 1
+    storage_backend: str = "local"  # "local" or "minio"
 
     # Local Storage
     local_storage_path: str = "./uploads"
+
+    # MinIO Configuration (Phase 2)
+    minio_endpoint: str = "localhost:9000"
+    minio_access_key: str = "minioadmin"
+    minio_secret_key: str = "minioadmin"
+    minio_bucket: str = "images"
+    minio_secure: bool = False  # True for HTTPS
 
     # Application
     app_env: str = "development"

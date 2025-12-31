@@ -12,7 +12,11 @@ from app.database import init_db, close_db
 from app.api.images import router as images_router
 from app.api.health import router as health_router
 from app.schemas.error import ErrorResponse, ErrorDetail, ErrorCodes
-from app.services.storage_service import StorageService, LocalStorageBackend
+from app.services.storage_service import (
+    StorageService,
+    LocalStorageBackend,
+    MinioStorageBackend,
+)
 
 # SQLAlchemy exceptions for database error handling
 from sqlalchemy.exc import OperationalError, TimeoutError as SQLAlchemyTimeoutError
@@ -30,10 +34,19 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     print("✅ Database initialized")
 
-    # Initialize storage backend (local filesystem only in Phase 1)
-    storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
-    app.state.storage = StorageService(backend=storage_backend)
-    print("✅ Storage initialized (local filesystem)")
+    # Initialize storage backend based on configuration
+    if settings.storage_backend == "minio":
+        storage_backend = MinioStorageBackend(
+            endpoint=settings.minio_endpoint,
+            access_key=settings.minio_access_key,
+            secret_key=settings.minio_secret_key,
+            bucket=settings.minio_bucket,
+            secure=settings.minio_secure,
+        )
+        print("✅ Storage initialized (MinIO)")
+    else:
+        storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
+        print("✅ Storage initialized (local filesystem)")
 
     print("✅ Image Hosting API ready!")
 

@@ -17,6 +17,7 @@ dependencies = [
 
     # Storage
     "aiofiles>=24.1.0",
+    "minio>=7.2.0",           # Phase 2: S3-compatible object storage
 
     # Validation & Settings
     "pydantic>=2.10.0",
@@ -51,8 +52,7 @@ dev = [
 
 # Optional dependencies for future phases
 future = [
-    "minio>=7.2.0",           # Phase 2: Production storage
-    "python-magic>=0.4.27",   # Phase 2: Advanced validation
+    "python-magic>=0.4.27",   # Phase 2: Advanced validation (deferred)
 ]
 
 [tool.ruff]
