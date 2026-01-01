@@ -41,3 +41,4 @@ uploads/
 # uv
 .uv/
 uv.lock
+.claude/settings.local.json

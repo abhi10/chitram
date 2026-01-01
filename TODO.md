@@ -125,6 +125,13 @@
   - [ ] Add `asyncio.Semaphore` for concurrent upload limits
   - [ ] Prevent file collision on simultaneous uploads
   - [ ] Configure `SEMAPHORE_LIMIT` in settings
+- [ ] **Technical Debt & Performance Fixes:**
+  - [ ] 🔴 Fix sync Pillow blocking event loop (`asyncio.to_thread()` in `get_image_dimensions`)
+  - [ ] 🔴 Add rate limiting (DoS prevention) - covered in Rate Limiting above
+  - [ ] 🟡 Configure DB connection pool (`pool_size`, `max_overflow`, `pool_recycle`)
+  - [ ] 🟡 Make MinIO bucket check async with timeout (startup resilience)
+  - [ ] 🟡 Add logging for silent storage deletion failures (orphan tracking)
+  - [ ] 🟡 Consider streaming uploads (defer to Phase 3 if complex)
 - [ ] **Testing & Validation:**
   - [ ] All Phase 1 functionality preserved
   - [ ] Storage switching works
