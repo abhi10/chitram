@@ -2,7 +2,7 @@
 
 **Repository:** https://github.com/abhi10/chitram
 **Current Phase:** Phase 2 (Full Features)
-**Last Updated:** 2025-12-31
+**Last Updated:** 2026-01-01
 
 ---
 
@@ -101,7 +101,7 @@
 
 ### Week 1: Storage & Caching
 - [x] **Create feature branch** - `git checkout -b feature/phase-2`
-- [x] **MinIO Backend:** ✅ Complete
+- [x] **MinIO Backend:** ✅ Complete & Tested in Codespaces
   - [x] Add MinIO to docker-compose.yml (ports 9000/9001, health check)
   - [x] Restore `MinioStorageBackend` class (async with `asyncio.to_thread`)
   - [x] Add MinIO configuration to settings (`storage_backend`, endpoint, credentials)
@@ -110,7 +110,24 @@
   - [x] Update DevContainer post-create.sh (MinIO health check)
   - [x] Create unit tests (11 tests with mocking)
   - [x] Create integration tests (9 tests, auto-skip without MinIO)
-  - [x] All 22 regression + unit tests passing
+  - [x] All 31 tests passing (11 API + 11 Unit + 9 Integration)
+  - [x] **Codespaces Testing:** Validated full integration (see `docs/PHASE2_RETRO.md`)
+- [x] **CI/CD Pipeline:** ✅ Complete
+  - [x] GitHub Actions workflow (`.github/workflows/ci.yml`)
+  - [x] Lint job (Black + Ruff)
+  - [x] Test job (Python 3.11/3.12 with PostgreSQL + MinIO services)
+  - [x] Dependency check job (catches missing imports)
+- [x] **Automation Scripts:** ✅ Complete
+  - [x] `scripts/validate-env.sh` - Verify all services running
+  - [x] `scripts/run-tests.sh` - Run test suite with options
+  - [x] `scripts/smoke-test.sh` - Quick API CRUD test
+  - [x] `scripts/cleanup-test-data.sh` - Reset MinIO + DB
+- [x] **Documentation:** ✅ Complete
+  - [x] `docs/CODESPACES_RUNBOOK.md` - Dev Container testing guide
+  - [x] `docs/PHASE2_RETRO.md` - Retrospective with learnings
+- [x] **Dependency Cleanup:**
+  - [x] Removed duplicate `[dependency-groups]` section from pyproject.toml
+  - [x] Added missing deps: pillow, pytest, pytest-asyncio, pytest-cov, aiosqlite
 - [ ] **Redis Caching:**
   - [ ] Add Redis to docker-compose.yml
   - [ ] Add Redis dependency
@@ -526,9 +543,12 @@ git push origin --delete feature/phase-X.X
 - **Learnings:** `docs/learning/LEARNINGS.md` - DS building blocks tracker
 - **Testing:** `docs/testing/TESTING_STRATEGY.md` - Testing approach
 - **Validation:** `docs/PHASE1_TESTING.md` - Phase 1 test results
+- **Runbook:** `docs/CODESPACES_RUNBOOK.md` - Dev Container testing guide
+- **Retrospectives:** `docs/PHASE2_RETRO.md` - Phase 2 learnings
 - **Code Review:** `docs/code-review-checklist.md`
 - **Requirements:** `requirements.md`
 - **ADRs:** `docs/adr/` (9 decisions documented)
+- **CI/CD:** `.github/workflows/ci.yml` - GitHub Actions pipeline
 
 ### Archived Documents
 - **Archive:** `docs/archive/` - Historical docs preserved for reference
@@ -553,18 +573,29 @@ git push origin --delete feature/phase-X.X
 ## 🎯 Current Focus
 
 **Phase 2 - In Progress:**
-1. ✅ MinIO Backend setup - Complete!
-2. ⏳ Redis caching layer
-3. ⏳ Rate limiting implementation
-4. ⏳ User authentication (JWT)
-5. ⏳ Background jobs (Celery)
+1. ✅ MinIO Backend - Complete & Validated in Codespaces!
+2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
+3. ⏳ Redis caching layer (Next)
+4. ⏳ Rate limiting implementation
+5. ⏳ User authentication (JWT)
+6. ⏳ Background jobs (Celery)
 
-**Completed (Phase 2 - MinIO):**
+**Completed (Phase 2 - MinIO + CI):**
 - ✅ MinioStorageBackend implementation (Strategy Pattern)
 - ✅ Docker Compose with MinIO service
 - ✅ Configuration-based backend selection
-- ✅ Unit tests (11) + Integration tests (9)
-- ✅ All 22 tests passing (+ 9 skipped integration)
+- ✅ Unit tests (11) + Integration tests (9) + API tests (11)
+- ✅ All 31 tests passing in Codespaces
+- ✅ GitHub Actions CI workflow (lint, test, dependency-check)
+- ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
+- ✅ Codespaces Runbook + Phase 2 Retrospective docs
+
+**Key Learnings (Phase 2 Retro):**
+- 6 issues encountered, 4 blockers (all dependency-related)
+- Root cause: Local env had global packages not in pyproject.toml
+- Prevention: CI pipeline now catches missing deps before merge
+- Process: "Import → Add dependency → Commit together"
+- See: `docs/PHASE2_RETRO.md` for full analysis
 
 **Completed (Phase 1.5):**
 - ✅ Alembic migrations setup (2 migrations)
@@ -588,7 +619,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 
 **Current Status:** 🟢 On track
 **Blockers:** None
-**Last Updated:** 2025-12-31
+**Last Updated:** 2026-01-01
 
 ---
 
@@ -600,7 +631,12 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2025-12-24:** Phase 1 Lean validation complete (see `docs/PHASE1_TESTING.md`)
 - [x] **2025-12-24:** Docs cleanup - reorganized into architecture/, learning/, testing/, archive/
 - [x] **2025-12-31:** Phase 1.5 complete - Alembic migrations + Pillow image dimensions
-- [ ] **In Progress:** Phase 2 full features (MinIO, Redis, Auth, Background Jobs)
+- [x] **2025-12-31:** Phase 2 MinIO backend merged to main (PR #4)
+- [x] **2026-01-01:** Phase 2 MinIO validated in Codespaces (31 tests passing)
+- [x] **2026-01-01:** GitHub Actions CI pipeline added
+- [x] **2026-01-01:** Phase 2 Retrospective documented (6 issues, 4 blockers resolved)
+- [ ] **In Progress:** Phase 2 Redis caching + Rate limiting
+- [ ] **Next:** Phase 2 Auth + Background Jobs
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability
 - [ ] **Target:** v1.0.0 production-ready system
