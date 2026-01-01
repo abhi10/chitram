@@ -1,0 +1,188 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  lint:
+    name: Lint & Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --all-extras
+
+      - name: Check formatting with Black
+        working-directory: backend
+        run: uv run black --check .
+
+      - name: Lint with Ruff
+        working-directory: backend
+        run: uv run ruff check .
+
+  test:
+    name: Test (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12"]
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: imagehost
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      minio:
+        image: minio/minio:latest
+        ports:
+          - 9000:9000
+        env:
+          MINIO_ROOT_USER: minioadmin
+          MINIO_ROOT_PASSWORD: minioadmin
+        # MinIO needs a custom command, use options for health check
+        options: >-
+          --health-cmd "curl -sf http://localhost:9000/minio/health/live || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+asyncpg://app:localdev@localhost:5432/imagehost
+      STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: localhost:9000
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+      MINIO_BUCKET: images
+      MINIO_SECURE: "false"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Install dependencies
+        working-directory: backend
+        run: uv sync --all-extras
+
+      - name: Wait for MinIO to start
+        run: |
+          for i in {1..30}; do
+            if curl -sf http://localhost:9000/minio/health/live; then
+              echo "MinIO is ready"
+              break
+            fi
+            echo "Waiting for MinIO... ($i/30)"
+            sleep 2
+          done
+
+      - name: Create MinIO bucket
+        working-directory: backend
+        run: |
+          uv run python -c "
+          from minio import Minio
+          client = Minio('localhost:9000', access_key='minioadmin', secret_key='minioadmin', secure=False)
+          if not client.bucket_exists('images'):
+              client.make_bucket('images')
+              print('Created bucket: images')
+          else:
+              print('Bucket already exists: images')
+          "
+
+      - name: Run database migrations
+        working-directory: backend
+        run: uv run alembic upgrade head
+
+      - name: Run tests with coverage
+        working-directory: backend
+        run: uv run python -m pytest --cov=app --cov-report=xml --cov-report=term-missing
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        if: matrix.python-version == '3.11'
+        with:
+          files: backend/coverage.xml
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  # Catches missing dependencies by testing in a clean environment
+  dependency-check:
+    name: Dependency Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          version: "latest"
+
+      - name: Set up Python
+        run: uv python install ${{ env.PYTHON_VERSION }}
+
+      - name: Install only production dependencies
+        working-directory: backend
+        run: uv sync --no-dev
+
+      - name: Verify imports work
+        working-directory: backend
+        run: |
+          uv run python -c "
+          # Test that all production imports work
+          from app.main import app
+          from app.config import get_settings
+          from app.database import get_db
+          from app.models.image import Image
+          from app.schemas.image import ImageCreate, ImageResponse
+          from app.services.image_service import ImageService
+          from app.services.storage_service import StorageService, LocalStorageBackend, MinioStorageBackend
+          from app.utils.validation import validate_image_file
+          print('✅ All production imports verified')
+          "
+
+      - name: Install with dev dependencies
+        working-directory: backend
+        run: uv sync --all-extras
+
+      - name: Verify test imports work
+        working-directory: backend
+        run: |
+          uv run python -c "
+          # Test that all test imports work
+          import pytest
+          import pytest_asyncio
+          import aiosqlite
+          from PIL import Image
+          print('✅ All test imports verified')
+          "
