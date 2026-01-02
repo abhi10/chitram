@@ -58,20 +58,6 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9000:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        # MinIO needs a custom command, use options for health check
-        options: >-
-          --health-cmd "curl -sf http://localhost:9000/minio/health/live || exit 1"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
       redis:
         image: redis:7-alpine
         ports:
@@ -98,6 +84,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Start MinIO
+        run: |
+          docker run -d --name minio \
+            -p 9000:9000 \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            minio/minio:latest server /data
+
+          # Wait for MinIO to be ready
+          for i in {1..30}; do
+            if curl -sf http://localhost:9000/minio/health/live; then
+              echo "✅ MinIO is ready"
+              break
+            fi
+            echo "Waiting for MinIO... ($i/30)"
+            sleep 2
+          done
+
       - name: Install uv
         uses: astral-sh/setup-uv@v4
         with:
@@ -109,17 +113,6 @@ jobs:
       - name: Install dependencies
         working-directory: backend
         run: uv sync --all-extras
-
-      - name: Wait for MinIO to start
-        run: |
-          for i in {1..30}; do
-            if curl -sf http://localhost:9000/minio/health/live; then
-              echo "MinIO is ready"
-              break
-            fi
-            echo "Waiting for MinIO... ($i/30)"
-            sleep 2
-          done
 
       - name: Create MinIO bucket
         working-directory: backend
