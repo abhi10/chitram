@@ -1,23 +1,33 @@
 """Image service - business logic layer."""
 
+import contextlib
 import io
 import uuid
+from typing import TYPE_CHECKING
 
 from PIL import Image as PILImage
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.image import Image
-from app.schemas.image import ImageCreate
 from app.services.storage_service import StorageService
+
+if TYPE_CHECKING:
+    from app.services.cache_service import CacheService
 
 
 class ImageService:
     """Service for image operations."""
 
-    def __init__(self, db: AsyncSession, storage: StorageService):
+    def __init__(
+        self,
+        db: AsyncSession,
+        storage: StorageService,
+        cache: "CacheService | None" = None,
+    ):
         self.db = db
         self.storage = storage
+        self.cache = cache
 
     @staticmethod
     def generate_storage_key(filename: str) -> str:
@@ -100,12 +110,76 @@ class ImageService:
         await self.db.commit()
         await self.db.refresh(image)
 
+        # Cache the newly uploaded image metadata
+        if self.cache:
+            await self.cache.set_image_metadata(image.id, self._image_to_dict(image))
+
         return image
 
-    async def get_by_id(self, image_id: str) -> Image | None:
-        """Get image metadata by ID."""
+    async def get_by_id(self, image_id: str, use_cache: bool = True) -> Image | None:
+        """
+        Get image metadata by ID with optional caching.
+
+        Args:
+            image_id: The image UUID
+            use_cache: Whether to use cache (default True)
+
+        Returns:
+            Image model or None if not found
+        """
+        result, _ = await self.get_by_id_with_cache_status(image_id, use_cache)
+        return result
+
+    async def get_by_id_with_cache_status(
+        self, image_id: str, use_cache: bool = True
+    ) -> tuple[Image | None, str]:
+        """
+        Get image metadata by ID with cache hit/miss status.
+
+        Args:
+            image_id: The image UUID
+            use_cache: Whether to use cache (default True)
+
+        Returns:
+            Tuple of (Image model or None, cache_status)
+            cache_status is one of: "HIT", "MISS", "DISABLED"
+        """
+        # Try cache first
+        if use_cache and self.cache:
+            cached = await self.cache.get_image_metadata(image_id)
+            if cached:
+                # Reconstruct Image model from cached dict
+                return Image(**cached), "HIT"
+
+            # Cache miss - fetch from DB
+            result = await self.db.execute(select(Image).where(Image.id == image_id))
+            image = result.scalar_one_or_none()
+
+            # Populate cache on DB hit
+            if image:
+                await self.cache.set_image_metadata(image_id, self._image_to_dict(image))
+
+            return image, "MISS"
+
+        # Cache disabled or not configured
         result = await self.db.execute(select(Image).where(Image.id == image_id))
-        return result.scalar_one_or_none()
+        image = result.scalar_one_or_none()
+        return image, "DISABLED"
+
+    @staticmethod
+    def _image_to_dict(image: Image) -> dict:
+        """Convert Image model to dict for caching."""
+        return {
+            "id": image.id,
+            "filename": image.filename,
+            "storage_key": image.storage_key,
+            "content_type": image.content_type,
+            "file_size": image.file_size,
+            "upload_ip": image.upload_ip,
+            "width": image.width,
+            "height": image.height,
+            "created_at": image.created_at.isoformat() if image.created_at else None,
+        }
 
     async def get_file(self, image_id: str) -> tuple[bytes, str] | None:
         """
@@ -131,15 +205,18 @@ class ImageService:
         Returns:
             True if deleted, False if not found
         """
-        image = await self.get_by_id(image_id)
+        # Skip cache when fetching for deletion to ensure we have fresh DB state
+        image = await self.get_by_id(image_id, use_cache=False)
         if not image:
             return False
 
         # Delete from storage (graceful - continue even if storage delete fails)
-        try:
+        with contextlib.suppress(Exception):
             await self.storage.delete(image.storage_key)
-        except Exception:
-            pass  # Log this in production
+
+        # Invalidate cache
+        if self.cache:
+            await self.cache.invalidate_image(image_id)
 
         # Delete from database
         await self.db.delete(image)

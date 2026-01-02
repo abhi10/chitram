@@ -5,11 +5,11 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
+from app.config import get_settings
 
 # Import our models and Base
 from app.database import Base
 from app.models.image import Image  # noqa: F401 - Import to register model
-from app.config import get_settings
 
 # this is the Alembic Config object
 config = context.config

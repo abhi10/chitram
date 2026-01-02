@@ -8,8 +8,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.database import get_db
-from app.schemas.error import ErrorResponse, ErrorDetail, ErrorCodes
+from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
+from app.services.cache_service import CacheService
 from app.services.image_service import ImageService
 from app.services.storage_service import StorageService
 from app.utils.validation import validate_image_file
@@ -23,12 +24,18 @@ def get_storage(request: Request) -> StorageService:
     return request.app.state.storage
 
 
+def get_cache(request: Request) -> CacheService | None:
+    """Dependency to get cache service from app state."""
+    return getattr(request.app.state, "cache", None)
+
+
 def get_image_service(
     db: AsyncSession = Depends(get_db),
     storage: StorageService = Depends(get_storage),
+    cache: CacheService | None = Depends(get_cache),
 ) -> ImageService:
     """Dependency to get image service."""
-    return ImageService(db=db, storage=storage)
+    return ImageService(db=db, storage=storage, cache=cache)
 
 
 def get_client_ip(request: Request) -> str:
@@ -102,15 +109,21 @@ async def upload_image(
 
 @router.get(
     "/{image_id}",
-    response_model=ImageMetadata,
-    responses={404: {"model": ErrorResponse, "description": "Image not found"}},
+    responses={
+        200: {"model": ImageMetadata},
+        404: {"model": ErrorResponse, "description": "Image not found"},
+    },
 )
 async def get_image_metadata(
     image_id: str,
     service: ImageService = Depends(get_image_service),
-) -> ImageMetadata:
-    """Get image metadata by ID."""
-    image = await service.get_by_id(image_id)
+) -> Response:
+    """
+    Get image metadata by ID.
+
+    Returns X-Cache header: HIT (from cache), MISS (from DB, cached), or DISABLED
+    """
+    image, cache_status = await service.get_by_id_with_cache_status(image_id)
 
     if not image:
         raise HTTPException(
@@ -121,7 +134,12 @@ async def get_image_metadata(
             ).model_dump(),
         )
 
-    return ImageMetadata.model_validate(image)
+    metadata = ImageMetadata.model_validate(image)
+    return Response(
+        content=metadata.model_dump_json(),
+        media_type="application/json",
+        headers={"X-Cache": cache_status},
+    )
 
 
 @router.get(
