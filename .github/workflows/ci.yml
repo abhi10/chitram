@@ -72,6 +72,16 @@ jobs:
           --health-timeout 5s
           --health-retries 5
 
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     env:
       DATABASE_URL: postgresql+asyncpg://app:localdev@localhost:5432/imagehost
       STORAGE_BACKEND: minio
@@ -80,6 +90,10 @@ jobs:
       MINIO_SECRET_KEY: minioadmin
       MINIO_BUCKET: images
       MINIO_SECURE: "false"
+      # Redis configuration
+      REDIS_HOST: localhost
+      REDIS_PORT: 6379
+      CACHE_ENABLED: "true"
 
     steps:
       - uses: actions/checkout@v4
@@ -167,6 +181,7 @@ jobs:
           from app.schemas.image import ImageCreate, ImageResponse
           from app.services.image_service import ImageService
           from app.services.storage_service import StorageService, LocalStorageBackend, MinioStorageBackend
+          from app.services.cache_service import CacheService
           from app.utils.validation import validate_image_file
           print('✅ All production imports verified')
           "
