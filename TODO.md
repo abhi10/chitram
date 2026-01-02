@@ -546,7 +546,9 @@ git push origin --delete feature/phase-X.X
 - **Runbook:** `docs/CODESPACES_RUNBOOK.md` - Dev Container testing guide
 - **Retrospectives:** `docs/PHASE2_RETRO.md` - Phase 2 learnings
 - **Code Review:** `docs/code-review-checklist.md`
-- **Requirements:** `requirements.md`
+- **Requirements:**
+  - `requirements.md` - Phase 1 requirements
+  - `requirements-phase2.md` - Phase 2 requirements (EARS format)
 - **ADRs:** `docs/adr/` (9 decisions documented)
 - **CI/CD:** `.github/workflows/ci.yml` - GitHub Actions pipeline
 

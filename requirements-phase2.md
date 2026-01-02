@@ -8,6 +8,8 @@ This document defines the functional and non-functional requirements for Phase 2
 
 **Prerequisites:** Phase 1 Lean + Phase 1.5 complete
 
+> **Note:** This document defines *what* to build (requirements). For implementation *progress* and *status*, see [TODO.md](./TODO.md#-phase-2---full-features-current).
+
 ---
 
 ## EARS Patterns Reference
@@ -27,62 +29,62 @@ This document defines the functional and non-functional requirements for Phase 2
 ### FR-2.1: MinIO Object Storage
 
 #### FR-2.1.1: Storage Backend Selection
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.1.1a | **Where** `STORAGE_BACKEND=minio` is configured, the system shall store image files in MinIO object storage | Must | ✅ Done |
-| FR-2.1.1b | **Where** `STORAGE_BACKEND=local` is configured, the system shall store image files on local filesystem | Must | ✅ Done |
-| FR-2.1.1c | The system shall use the Strategy Pattern to switch between storage backends without code changes | Must | ✅ Done |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.1.1a | **Where** `STORAGE_BACKEND=minio` is configured, the system shall store image files in MinIO object storage | Must |
+| FR-2.1.1b | **Where** `STORAGE_BACKEND=local` is configured, the system shall store image files on local filesystem | Must |
+| FR-2.1.1c | The system shall use the Strategy Pattern to switch between storage backends without code changes | Must |
 
 #### FR-2.1.2: MinIO Operations
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.1.2a | **When** an image is uploaded, the system shall store the file in the configured MinIO bucket with a UUID-based key | Must | ✅ Done |
-| FR-2.1.2b | **When** an image file is requested, the system shall retrieve it from MinIO and stream it to the client | Must | ✅ Done |
-| FR-2.1.2c | **When** an image is deleted, the system shall remove the file from MinIO storage | Must | ✅ Done |
-| FR-2.1.2d | **If** MinIO is unavailable during upload, the system shall return 503 SERVICE_UNAVAILABLE | Must | ✅ Done |
-| FR-2.1.2e | **If** MinIO is unavailable during deletion, the system shall still delete the database record (graceful degradation) | Should | ✅ Done |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.1.2a | **When** an image is uploaded, the system shall store the file in the configured MinIO bucket with a UUID-based key | Must |
+| FR-2.1.2b | **When** an image file is requested, the system shall retrieve it from MinIO and stream it to the client | Must |
+| FR-2.1.2c | **When** an image is deleted, the system shall remove the file from MinIO storage | Must |
+| FR-2.1.2d | **If** MinIO is unavailable during upload, the system shall return 503 SERVICE_UNAVAILABLE | Must |
+| FR-2.1.2e | **If** MinIO is unavailable during deletion, the system shall still delete the database record (graceful degradation) | Should |
 
 #### FR-2.1.3: MinIO Configuration
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.1.3a | The system shall read MinIO connection settings from environment variables (endpoint, access_key, secret_key, bucket) | Must | ✅ Done |
-| FR-2.1.3b | **When** the application starts with `STORAGE_BACKEND=minio`, the system shall verify MinIO connectivity | Should | ✅ Done |
-| FR-2.1.3c | **If** the configured bucket does not exist, the system shall create it automatically | Should | ✅ Done |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.1.3a | The system shall read MinIO connection settings from environment variables (endpoint, access_key, secret_key, bucket) | Must |
+| FR-2.1.3b | **When** the application starts with `STORAGE_BACKEND=minio`, the system shall verify MinIO connectivity | Should |
+| FR-2.1.3c | **If** the configured bucket does not exist, the system shall create it automatically | Should |
 
 ---
 
 ### FR-2.2: Redis Caching
 
 #### FR-2.2.1: Cache Infrastructure
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.2.1a | **Where** Redis is configured, the system shall cache image metadata to reduce database queries | Must | ⏳ Pending |
-| FR-2.2.1b | The system shall connect to Redis using connection pooling | Should | ⏳ Pending |
-| FR-2.2.1c | **If** Redis is unavailable, the system shall fall back to database queries (graceful degradation) | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.2.1a | **Where** Redis is configured, the system shall cache image metadata to reduce database queries | Must |
+| FR-2.2.1b | The system shall connect to Redis using connection pooling | Should |
+| FR-2.2.1c | **If** Redis is unavailable, the system shall fall back to database queries (graceful degradation) | Must |
 
 #### FR-2.2.2: Cache Operations
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.2.2a | **When** image metadata is requested, the system shall first check the Redis cache | Must | ⏳ Pending |
-| FR-2.2.2b | **If** a cache miss occurs, the system shall query the database and populate the cache | Must | ⏳ Pending |
-| FR-2.2.2c | **When** an image is uploaded, the system shall cache its metadata with TTL of 1 hour | Should | ⏳ Pending |
-| FR-2.2.2d | **When** an image is deleted, the system shall invalidate its cache entry | Must | ⏳ Pending |
-| FR-2.2.2e | **When** an image is updated, the system shall invalidate its cache entry | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.2.2a | **When** image metadata is requested, the system shall first check the Redis cache | Must |
+| FR-2.2.2b | **If** a cache miss occurs, the system shall query the database and populate the cache | Must |
+| FR-2.2.2c | **When** an image is uploaded, the system shall cache its metadata with TTL of 1 hour | Should |
+| FR-2.2.2d | **When** an image is deleted, the system shall invalidate its cache entry | Must |
+| FR-2.2.2e | **When** an image is updated, the system shall invalidate its cache entry | Must |
 
 #### FR-2.2.3: Cache Configuration
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.2.3a | The system shall read Redis connection settings from environment variables (host, port, password, db) | Must | ⏳ Pending |
-| FR-2.2.3b | The system shall use a configurable cache TTL (default: 3600 seconds) | Should | ⏳ Pending |
-| FR-2.2.3c | The system shall use a key prefix to namespace cache entries (e.g., `chitram:image:{id}`) | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.2.3a | The system shall read Redis connection settings from environment variables (host, port, password, db) | Must |
+| FR-2.2.3b | The system shall use a configurable cache TTL (default: 3600 seconds) | Should |
+| FR-2.2.3c | The system shall use a key prefix to namespace cache entries (e.g., `chitram:image:{id}`) | Should |
 
 #### FR-2.2.4: Cache Validation & Testing
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.2.4a | **When** the application starts, the system shall verify Redis connectivity and log status | Should | ⏳ Pending |
-| FR-2.2.4b | Health check endpoint shall report Redis connection status (`"cache": "connected"` or `"cache": "disconnected"`) | Must | ⏳ Pending |
-| FR-2.2.4c | The system shall expose cache statistics endpoint (`GET /api/v1/admin/cache/stats`) with hit/miss counts | Could | ⏳ Pending |
-| FR-2.2.4d | **When** `CACHE_DEBUG=true`, the system shall log cache operations (get, set, invalidate) | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.2.4a | **When** the application starts, the system shall verify Redis connectivity and log status | Should |
+| FR-2.2.4b | Health check endpoint shall report Redis connection status (`"cache": "connected"` or `"cache": "disconnected"`) | Must |
+| FR-2.2.4c | The system shall expose cache statistics endpoint (`GET /api/v1/admin/cache/stats`) with hit/miss counts | Could |
+| FR-2.2.4d | **When** `CACHE_DEBUG=true`, the system shall log cache operations (get, set, invalidate) | Should |
 
 #### FR-2.2.5: Cache Testing Strategy
 | Test Type | Description | Verification Method |
@@ -111,117 +113,117 @@ This document defines the functional and non-functional requirements for Phase 2
 ### FR-2.3: Rate Limiting
 
 #### FR-2.3.1: Rate Limit Enforcement
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.3.1a | The system shall limit API requests per IP address using a sliding window algorithm | Must | ⏳ Pending |
-| FR-2.3.1b | **If** an IP exceeds 10 requests per minute, the system shall return 429 TOO_MANY_REQUESTS | Must | ⏳ Pending |
-| FR-2.3.1c | **When** rate limit is exceeded, the response shall include `Retry-After` header with seconds until reset | Must | ⏳ Pending |
-| FR-2.3.1d | **While** an IP is rate limited, the system shall reject requests immediately without processing | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.3.1a | The system shall limit API requests per IP address using a sliding window algorithm | Must |
+| FR-2.3.1b | **If** an IP exceeds 10 requests per minute, the system shall return 429 TOO_MANY_REQUESTS | Must |
+| FR-2.3.1c | **When** rate limit is exceeded, the response shall include `Retry-After` header with seconds until reset | Must |
+| FR-2.3.1d | **While** an IP is rate limited, the system shall reject requests immediately without processing | Should |
 
 #### FR-2.3.2: Rate Limit Storage
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.3.2a | **Where** Redis is available, the system shall store rate limit counters in Redis | Must | ⏳ Pending |
-| FR-2.3.2b | **If** Redis is unavailable, the system shall allow requests through (fail-open for availability) | Should | ⏳ Pending |
-| FR-2.3.2c | Rate limit counters shall expire automatically after the window period | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.3.2a | **Where** Redis is available, the system shall store rate limit counters in Redis | Must |
+| FR-2.3.2b | **If** Redis is unavailable, the system shall allow requests through (fail-open for availability) | Should |
+| FR-2.3.2c | Rate limit counters shall expire automatically after the window period | Must |
 
 #### FR-2.3.3: Rate Limit Configuration
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.3.3a | The system shall allow configurable rate limits via environment variables | Should | ⏳ Pending |
-| FR-2.3.3b | The system shall support different limits for different endpoints (upload vs read) | Could | ⏳ Pending |
-| FR-2.3.3c | The system shall support IP whitelist for unlimited access (admin/monitoring) | Could | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.3.3a | The system shall allow configurable rate limits via environment variables | Should |
+| FR-2.3.3b | The system shall support different limits for different endpoints (upload vs read) | Could |
+| FR-2.3.3c | The system shall support IP whitelist for unlimited access (admin/monitoring) | Could |
 
 ---
 
 ### FR-2.4: User Authentication
 
 #### FR-2.4.1: User Registration
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.4.1a | **When** a user registers, the system shall create a user account with email and hashed password | Must | ⏳ Pending |
-| FR-2.4.1b | **If** the email is already registered, the system shall return 409 CONFLICT | Must | ⏳ Pending |
-| FR-2.4.1c | The system shall hash passwords using bcrypt with appropriate work factor | Must | ⏳ Pending |
-| FR-2.4.1d | **When** registration succeeds, the system shall return a JWT access token | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.4.1a | **When** a user registers, the system shall create a user account with email and hashed password | Must |
+| FR-2.4.1b | **If** the email is already registered, the system shall return 409 CONFLICT | Must |
+| FR-2.4.1c | The system shall hash passwords using bcrypt with appropriate work factor | Must |
+| FR-2.4.1d | **When** registration succeeds, the system shall return a JWT access token | Should |
 
 #### FR-2.4.2: User Login
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.4.2a | **When** valid credentials are provided, the system shall return a JWT access token | Must | ⏳ Pending |
-| FR-2.4.2b | **If** credentials are invalid, the system shall return 401 UNAUTHORIZED | Must | ⏳ Pending |
-| FR-2.4.2c | JWT tokens shall expire after a configurable period (default: 24 hours) | Must | ⏳ Pending |
-| FR-2.4.2d | JWT tokens shall contain user ID and expiration claims | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.4.2a | **When** valid credentials are provided, the system shall return a JWT access token | Must |
+| FR-2.4.2b | **If** credentials are invalid, the system shall return 401 UNAUTHORIZED | Must |
+| FR-2.4.2c | JWT tokens shall expire after a configurable period (default: 24 hours) | Must |
+| FR-2.4.2d | JWT tokens shall contain user ID and expiration claims | Must |
 
 #### FR-2.4.3: Protected Routes
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.4.3a | **When** a valid JWT is provided, the system shall identify the authenticated user | Must | ⏳ Pending |
-| FR-2.4.3b | **If** JWT is missing or invalid, protected routes shall return 401 UNAUTHORIZED | Must | ⏳ Pending |
-| FR-2.4.3c | **If** JWT is expired, the system shall return 401 with code TOKEN_EXPIRED | Must | ⏳ Pending |
-| FR-2.4.3d | Upload endpoint shall associate images with the authenticated user | Must | ⏳ Pending |
-| FR-2.4.3e | Delete endpoint shall only allow deletion by image owner or admin | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.4.3a | **When** a valid JWT is provided, the system shall identify the authenticated user | Must |
+| FR-2.4.3b | **If** JWT is missing or invalid, protected routes shall return 401 UNAUTHORIZED | Must |
+| FR-2.4.3c | **If** JWT is expired, the system shall return 401 with code TOKEN_EXPIRED | Must |
+| FR-2.4.3d | Upload endpoint shall associate images with the authenticated user | Must |
+| FR-2.4.3e | Delete endpoint shall only allow deletion by image owner or admin | Must |
 
 #### FR-2.4.4: Anonymous Access (Backward Compatibility)
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.4.4a | **Where** authentication is optional, the system shall allow anonymous uploads | Should | ⏳ Pending |
-| FR-2.4.4b | Anonymous images shall have `user_id = NULL` in the database | Should | ⏳ Pending |
-| FR-2.4.4c | Image retrieval (GET) shall remain public (no auth required) | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.4.4a | **Where** authentication is optional, the system shall allow anonymous uploads | Should |
+| FR-2.4.4b | Anonymous images shall have `user_id = NULL` in the database | Should |
+| FR-2.4.4c | Image retrieval (GET) shall remain public (no auth required) | Must |
 
 ---
 
 ### FR-2.5: Delete Tokens
 
 #### FR-2.5.1: Token Generation
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.5.1a | **When** an anonymous image is uploaded, the system shall generate a secure delete token | Must | ⏳ Pending |
-| FR-2.5.1b | Delete tokens shall be cryptographically random (minimum 32 bytes, URL-safe) | Must | ⏳ Pending |
-| FR-2.5.1c | Delete tokens shall be returned in the upload response | Must | ⏳ Pending |
-| FR-2.5.1d | Delete tokens shall be stored as hashed values (not plaintext) | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.5.1a | **When** an anonymous image is uploaded, the system shall generate a secure delete token | Must |
+| FR-2.5.1b | Delete tokens shall be cryptographically random (minimum 32 bytes, URL-safe) | Must |
+| FR-2.5.1c | Delete tokens shall be returned in the upload response | Must |
+| FR-2.5.1d | Delete tokens shall be stored as hashed values (not plaintext) | Should |
 
 #### FR-2.5.2: Token Validation
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.5.2a | **When** deleting an anonymous image, the system shall require the delete token | Must | ⏳ Pending |
-| FR-2.5.2b | **If** the delete token is incorrect, the system shall return 403 FORBIDDEN | Must | ⏳ Pending |
-| FR-2.5.2c | **If** the user is authenticated and owns the image, delete token is not required | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.5.2a | **When** deleting an anonymous image, the system shall require the delete token | Must |
+| FR-2.5.2b | **If** the delete token is incorrect, the system shall return 403 FORBIDDEN | Must |
+| FR-2.5.2c | **If** the user is authenticated and owns the image, delete token is not required | Should |
 
 ---
 
 ### FR-2.6: Background Jobs
 
 #### FR-2.6.1: Job Queue Infrastructure
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.6.1a | The system shall use Celery with Redis as message broker for background tasks | Must | ⏳ Pending |
-| FR-2.6.1b | Background jobs shall run in separate worker processes | Must | ⏳ Pending |
-| FR-2.6.1c | **If** a job fails, the system shall retry up to 3 times with exponential backoff | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.6.1a | The system shall use Celery with Redis as message broker for background tasks | Must |
+| FR-2.6.1b | Background jobs shall run in separate worker processes | Must |
+| FR-2.6.1c | **If** a job fails, the system shall retry up to 3 times with exponential backoff | Should |
 
 #### FR-2.6.2: Thumbnail Generation
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.6.2a | **When** an image is uploaded, the system shall queue a thumbnail generation job | Should | ⏳ Pending |
-| FR-2.6.2b | The system shall generate 3 thumbnail sizes: small (150px), medium (300px), large (600px) | Should | ⏳ Pending |
-| FR-2.6.2c | Thumbnails shall maintain aspect ratio | Must | ⏳ Pending |
-| FR-2.6.2d | Thumbnails shall be stored in the same storage backend as originals | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.6.2a | **When** an image is uploaded, the system shall queue a thumbnail generation job | Should |
+| FR-2.6.2b | The system shall generate 3 thumbnail sizes: small (150px), medium (300px), large (600px) | Should |
+| FR-2.6.2c | Thumbnails shall maintain aspect ratio | Must |
+| FR-2.6.2d | Thumbnails shall be stored in the same storage backend as originals | Must |
 
 #### FR-2.6.3: Checksum Calculation
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.6.3a | **When** an image is uploaded, the system shall calculate and store SHA-256 checksum | Should | ⏳ Pending |
-| FR-2.6.3b | Checksum calculation shall run as a background job (non-blocking) | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.6.3a | **When** an image is uploaded, the system shall calculate and store SHA-256 checksum | Should |
+| FR-2.6.3b | Checksum calculation shall run as a background job (non-blocking) | Should |
 
 ---
 
 ### FR-2.7: Advanced Validation
 
 #### FR-2.7.1: File Type Detection
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| FR-2.7.1a | The system shall validate file content using magic bytes (file signature) | Must | ✅ Done |
-| FR-2.7.1b | **If** Content-Type header doesn't match file signature, the system shall reject the upload | Must | ✅ Done |
-| FR-2.7.1c | **Where** python-magic is available, the system shall use it for enhanced detection | Could | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.7.1a | The system shall validate file content using magic bytes (file signature) | Must |
+| FR-2.7.1b | **If** Content-Type header doesn't match file signature, the system shall reject the upload | Must |
+| FR-2.7.1c | **Where** python-magic is available, the system shall use it for enhanced detection | Could |
 
 ---
 
@@ -229,56 +231,56 @@ This document defines the functional and non-functional requirements for Phase 2
 
 ### NFR-2.1: Performance
 
-| ID | EARS Requirement | Target | Priority | Status |
-|----|------------------|--------|----------|--------|
-| NFR-2.1.1 | **When** metadata is cached, retrieval response time shall be < 50ms | < 50ms | Should | ⏳ Pending |
-| NFR-2.1.2 | Cache hit ratio shall exceed 80% for repeated metadata requests | > 80% | Should | ⏳ Pending |
-| NFR-2.1.3 | MinIO upload throughput shall support files up to 5MB in < 2 seconds | < 2s | Should | ✅ Done |
-| NFR-2.1.4 | Rate limit checking shall add < 5ms overhead per request | < 5ms | Should | ⏳ Pending |
+| ID | EARS Requirement | Target | Priority |
+|----|------------------|--------|----------|
+| NFR-2.1.1 | **When** metadata is cached, retrieval response time shall be < 50ms | < 50ms | Should |
+| NFR-2.1.2 | Cache hit ratio shall exceed 80% for repeated metadata requests | > 80% | Should |
+| NFR-2.1.3 | MinIO upload throughput shall support files up to 5MB in < 2 seconds | < 2s | Should |
+| NFR-2.1.4 | Rate limit checking shall add < 5ms overhead per request | < 5ms | Should |
 
 ### NFR-2.2: Reliability
 
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| NFR-2.2.1 | **If** Redis is unavailable, the system shall continue operating with degraded caching | Must | ⏳ Pending |
-| NFR-2.2.2 | **If** MinIO is unavailable, uploads shall fail gracefully with clear error message | Must | ✅ Done |
-| NFR-2.2.3 | **If** a background job fails, it shall not affect the main API response | Must | ⏳ Pending |
-| NFR-2.2.4 | The system shall log all failures with sufficient context for debugging | Must | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| NFR-2.2.1 | **If** Redis is unavailable, the system shall continue operating with degraded caching | Must |
+| NFR-2.2.2 | **If** MinIO is unavailable, uploads shall fail gracefully with clear error message | Must |
+| NFR-2.2.3 | **If** a background job fails, it shall not affect the main API response | Must |
+| NFR-2.2.4 | The system shall log all failures with sufficient context for debugging | Must |
 
 ### NFR-2.3: Security
 
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| NFR-2.3.1 | JWT secrets shall be configurable via environment variables (never hardcoded) | Must | ⏳ Pending |
-| NFR-2.3.2 | Passwords shall be hashed using bcrypt with work factor >= 12 | Must | ⏳ Pending |
-| NFR-2.3.3 | Delete tokens shall be cryptographically random (256 bits minimum entropy) | Must | ⏳ Pending |
-| NFR-2.3.4 | MinIO credentials shall be stored as environment variables | Must | ✅ Done |
-| NFR-2.3.5 | Redis connection shall support password authentication | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| NFR-2.3.1 | JWT secrets shall be configurable via environment variables (never hardcoded) | Must |
+| NFR-2.3.2 | Passwords shall be hashed using bcrypt with work factor >= 12 | Must |
+| NFR-2.3.3 | Delete tokens shall be cryptographically random (256 bits minimum entropy) | Must |
+| NFR-2.3.4 | MinIO credentials shall be stored as environment variables | Must |
+| NFR-2.3.5 | Redis connection shall support password authentication | Should |
 
 ### NFR-2.4: Scalability
 
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| NFR-2.4.1 | The system shall support 100+ concurrent users with caching enabled | Should | ⏳ Pending |
-| NFR-2.4.2 | Redis and MinIO shall be external services (not in-process) for horizontal scaling | Must | ✅ Done |
-| NFR-2.4.3 | Database connections shall use connection pooling | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| NFR-2.4.1 | The system shall support 100+ concurrent users with caching enabled | Should |
+| NFR-2.4.2 | Redis and MinIO shall be external services (not in-process) for horizontal scaling | Must |
+| NFR-2.4.3 | Database connections shall use connection pooling | Should |
 
 ### NFR-2.5: Observability
 
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| NFR-2.5.1 | The system shall log cache hits/misses for monitoring | Should | ⏳ Pending |
-| NFR-2.5.2 | The system shall log rate limit events (exceeded, near-limit) | Should | ⏳ Pending |
-| NFR-2.5.3 | Health check endpoint shall report status of Redis and MinIO | Should | ⏳ Pending |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| NFR-2.5.1 | The system shall log cache hits/misses for monitoring | Should |
+| NFR-2.5.2 | The system shall log rate limit events (exceeded, near-limit) | Should |
+| NFR-2.5.3 | Health check endpoint shall report status of Redis and MinIO | Should |
 
 ### NFR-2.6: Testing
 
-| ID | EARS Requirement | Priority | Status |
-|----|------------------|----------|--------|
-| NFR-2.6.1 | All new features shall have unit tests with > 80% coverage | Must | ✅ Partial |
-| NFR-2.6.2 | Integration tests shall verify Redis and MinIO connectivity | Must | ✅ Done |
-| NFR-2.6.3 | CI pipeline shall run all tests before merge | Must | ✅ Done |
-| NFR-2.6.4 | Dependency check shall verify all imports resolve | Must | ✅ Done |
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| NFR-2.6.1 | All new features shall have unit tests with > 80% coverage | Must |
+| NFR-2.6.2 | Integration tests shall verify Redis and MinIO connectivity | Must |
+| NFR-2.6.3 | CI pipeline shall run all tests before merge | Must |
+| NFR-2.6.4 | Dependency check shall verify all imports resolve | Must |
 
 ---
 
