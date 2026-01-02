@@ -1,9 +1,9 @@
 """Image SQLAlchemy model."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
-from sqlalchemy import String, Integer, DateTime
+from sqlalchemy import DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -16,7 +16,7 @@ def generate_uuid() -> str:
 
 def utc_now() -> datetime:
     """Get current UTC timestamp."""
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Image(Base):

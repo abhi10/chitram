@@ -1,8 +1,8 @@
 # Dev Container Testing Runbook
 
 **Purpose:** Step-by-step guide for testing Chitram in Dev Containers (local VS Code or GitHub Codespaces)
-**Last Updated:** 2025-01-01
-**Phase:** 2 (MinIO Storage Backend)
+**Last Updated:** 2026-01-02
+**Phase:** 2 (MinIO Storage + Redis Caching)
 
 ---
 
@@ -13,6 +13,7 @@
 | FastAPI Docs | `http://localhost:8000/docs` | None |
 | MinIO Console | `http://localhost:9001` | minioadmin / minioadmin |
 | PostgreSQL | `localhost:5432` | app / localdev |
+| Redis | `localhost:6379` | None (no password) |
 
 ---
 
@@ -51,6 +52,7 @@ Look for these success messages in the terminal:
 ```
 ✅ PostgreSQL is ready!
 ✅ MinIO is ready!
+✅ Redis is ready!
 📝 Creating .env file...
 📦 Installing Python dependencies...
 🗄️ Running database migrations...
@@ -78,11 +80,15 @@ curl -sf http://minio:9000/minio/health/live && echo "✅ MinIO OK"
 
 # Verify PostgreSQL
 pg_isready -h postgres -U app -d imagehost && echo "✅ PostgreSQL OK"
+
+# Verify Redis
+redis-cli -h redis ping && echo "✅ Redis OK"
 ```
 
 **Troubleshooting:**
 - If PostgreSQL not ready → Wait and retry: `docker-compose ps`
 - If MinIO not ready → Check: `docker-compose logs minio`
+- If Redis not ready → Check: `docker-compose logs redis`
 - If migrations fail → Run: `cd backend && uv run alembic upgrade head`
 
 ---
@@ -101,6 +107,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0
 🚀 Starting Image Hosting API...
 ✅ Database initialized
 ✅ Storage initialized (MinIO)    # <-- Confirms MinIO backend
+✅ Redis cache connected          # <-- Confirms Redis caching
 ✅ Image Hosting API ready!
 INFO:     Uvicorn running on http://0.0.0.0:8000
 ```
@@ -137,20 +144,24 @@ Or use the test script:
 tests/api/test_images.py::TestUploadImage::test_upload_valid_jpeg PASSED
 tests/api/test_images.py::TestUploadImage::test_upload_valid_png PASSED
 ...
+tests/unit/test_cache_service.py::TestCacheServiceConnection::test_connect_success PASSED
 tests/unit/test_minio_storage.py::TestMinioStorageBackendInit::test_init_creates_bucket_if_not_exists PASSED
 ...
 tests/integration/test_minio_integration.py::TestMinioIntegration::test_save_and_get_roundtrip PASSED
+tests/integration/test_redis_integration.py::TestRedisIntegration::test_connection PASSED
 ...
 
-==================== 31 passed in X.XXs ====================
+==================== 43+ passed in X.XXs ====================
 ```
 
 **Test Breakdown:**
 | Suite | Count | Description |
 |-------|-------|-------------|
 | API Tests | 11 | Full CRUD via HTTP endpoints |
-| Unit Tests | 11 | MinIO backend with mocking |
-| Integration Tests | 9 | Real MinIO server operations |
+| Cache Unit Tests | 19 | Redis cache service with mocking |
+| MinIO Unit Tests | 11 | MinIO backend with mocking |
+| MinIO Integration | 9 | Real MinIO server operations |
+| Redis Integration | 11 | Real Redis server operations |
 
 ### 3.2 Run Specific Test Suites
 
@@ -162,7 +173,13 @@ uv run pytest tests/api -v
 uv run pytest tests/unit -v
 
 # MinIO integration tests only (requires MinIO running)
-uv run pytest tests/integration -v
+uv run pytest tests/integration/test_minio_integration.py -v
+
+# Redis integration tests only (requires Redis running)
+uv run pytest tests/integration/test_redis_integration.py -v
+
+# Cache unit tests only
+uv run pytest tests/unit/test_cache_service.py -v
 
 # With coverage report
 uv run pytest --cov=app --cov-report=term-missing
@@ -315,6 +332,106 @@ STORAGE_BACKEND=local uv run uvicorn app.main:app --reload --host 0.0.0.0
 
 ---
 
+## Part 5.5: Redis Caching Verification
+
+### 5.5.1 Verify Cache is Working
+
+**Step 1: Upload an image and note the ID**
+
+```bash
+# Upload test image
+curl -X POST "http://localhost:8000/api/v1/images/upload" \
+  -F "file=@/path/to/image.jpg"
+
+# Note the "id" from response, e.g., "abc123-..."
+```
+
+**Step 2: First GET request (cache MISS)**
+
+```bash
+curl -i "http://localhost:8000/api/v1/images/{image_id}"
+```
+
+**Expected Headers:**
+```
+HTTP/1.1 200 OK
+X-Cache: MISS
+Content-Type: application/json
+```
+
+**Step 3: Second GET request (cache HIT)**
+
+```bash
+curl -i "http://localhost:8000/api/v1/images/{image_id}"
+```
+
+**Expected Headers:**
+```
+HTTP/1.1 200 OK
+X-Cache: HIT
+Content-Type: application/json
+```
+
+### 5.5.2 Verify Cache Keys in Redis
+
+```bash
+# Connect to Redis CLI
+redis-cli -h redis
+
+# List all cache keys
+KEYS chitram:image:*
+
+# Get specific cached metadata
+GET chitram:image:{image_id}
+
+# Check TTL (should be ~3600 seconds for new entries)
+TTL chitram:image:{image_id}
+```
+
+### 5.5.3 Verify Cache Invalidation on Delete
+
+```bash
+# Delete image via API
+curl -X DELETE "http://localhost:8000/api/v1/images/{image_id}"
+
+# Check Redis - key should be gone
+redis-cli -h redis GET chitram:image:{image_id}
+# Returns: (nil)
+```
+
+### 5.5.4 Test Graceful Degradation
+
+**Stop Redis and verify API still works:**
+
+```bash
+# Stop Redis container
+docker-compose -f .devcontainer/docker-compose.yml stop redis
+
+# API should still work (X-Cache: DISABLED)
+curl -i "http://localhost:8000/api/v1/images/{image_id}"
+
+# Health check shows cache disconnected
+curl "http://localhost:8000/health"
+# {"status": "degraded", "cache": "disconnected", ...}
+
+# Restart Redis
+docker-compose -f .devcontainer/docker-compose.yml start redis
+```
+
+### 5.5.5 Check Cache Statistics
+
+```bash
+# Connect to Redis CLI
+redis-cli -h redis
+
+# Get cache hit/miss statistics
+INFO stats | grep keyspace
+# keyspace_hits:XX
+# keyspace_misses:XX
+```
+
+---
+
 ## Part 6: Health Checks
 
 ### 6.1 API Health Check
@@ -330,9 +447,15 @@ curl http://localhost:8000/health
   "version": "0.1.0",
   "environment": "development",
   "database": "connected",
-  "storage": "minio"
+  "storage": "minio",
+  "cache": "connected"
 }
 ```
+
+**Cache Status Values:**
+- `connected` - Redis is healthy and caching is active
+- `disconnected` - Redis unavailable, system running without cache
+- `disabled` - Caching disabled via `CACHE_ENABLED=false`
 
 ### 6.2 Service Health Checks
 
@@ -544,6 +667,40 @@ docker system prune -a
 # Cmd+Shift+P → "Dev Containers: Rebuild Container"
 ```
 
+### Issue: Redis not connecting / X-Cache always DISABLED
+
+```bash
+# Check Redis container is running
+docker-compose -f .devcontainer/docker-compose.yml ps redis
+
+# Test Redis connectivity
+redis-cli -h redis ping
+# Expected: PONG
+
+# Check Redis logs
+docker-compose -f .devcontainer/docker-compose.yml logs redis
+
+# Verify environment variables
+echo $REDIS_HOST     # Should be "redis"
+echo $CACHE_ENABLED  # Should be "true" or unset
+
+# Restart Redis
+docker-compose -f .devcontainer/docker-compose.yml restart redis
+```
+
+### Issue: Redis integration tests skipping
+
+Integration tests auto-skip if Redis is unavailable:
+
+```
+tests/integration/test_redis_integration.py::TestRedisIntegration::test_connection SKIPPED (Redis server not available)
+```
+
+**Fix:** Ensure Redis is running and accessible:
+```bash
+redis-cli -h redis ping
+```
+
 ---
 
 ## Quick Test Checklist
@@ -553,10 +710,11 @@ Run through this checklist for a quick validation:
 - [ ] Dev Container running (local or Codespaces)
 - [ ] Post-create script completed successfully
 - [ ] `./scripts/validate-env.sh` → All checks pass
-- [ ] `./scripts/run-tests.sh` → All 31 tests pass
-- [ ] Server starts with "Storage initialized (MinIO)"
+- [ ] `./scripts/run-tests.sh` → All 43+ tests pass
+- [ ] Server starts with "Storage initialized (MinIO)" and "Redis cache connected"
 - [ ] `./scripts/smoke-test.sh` → Upload/Get/Delete works
-- [ ] Health check shows `"storage": "minio"`
+- [ ] Health check shows `"storage": "minio"` and `"cache": "connected"`
+- [ ] First GET returns `X-Cache: MISS`, second returns `X-Cache: HIT`
 
 **Estimated Time:** 10-15 minutes
 

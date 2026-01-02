@@ -5,7 +5,6 @@ requiring an actual MinIO server. For integration tests with a real
 MinIO server, see tests/integration/test_minio_integration.py.
 """
 
-import io
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -24,7 +23,7 @@ class TestMinioStorageBackendInit:
         mock_client.bucket_exists.return_value = False
         mock_minio_class.return_value = mock_client
 
-        backend = MinioStorageBackend(
+        MinioStorageBackend(
             endpoint="localhost:9000",
             access_key="testkey",
             secret_key="testsecret",
@@ -42,7 +41,7 @@ class TestMinioStorageBackendInit:
         mock_client.bucket_exists.return_value = True
         mock_minio_class.return_value = mock_client
 
-        backend = MinioStorageBackend(
+        MinioStorageBackend(
             endpoint="localhost:9000",
             access_key="testkey",
             secret_key="testsecret",
@@ -70,7 +69,7 @@ class TestMinioStorageBackendInit:
         mock_minio_class.return_value = mock_client
 
         # Should not raise
-        backend = MinioStorageBackend(
+        MinioStorageBackend(
             endpoint="localhost:9000",
             access_key="testkey",
             secret_key="testsecret",

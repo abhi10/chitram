@@ -14,7 +14,6 @@ import uuid
 
 import pytest
 from minio import Minio
-from minio.error import S3Error
 
 from app.services.storage_service import MinioStorageBackend
 
@@ -179,6 +178,7 @@ class TestMinioIntegration:
 def sample_jpeg_bytes() -> bytes:
     """Create a valid JPEG test image."""
     import io
+
     from PIL import Image as PILImage
 
     img = PILImage.new("RGB", (100, 100), color="red")

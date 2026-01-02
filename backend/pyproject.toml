@@ -16,6 +16,9 @@ dependencies = [
     # Storage
     "aiofiles>=24.1.0",
     "minio>=7.2.0",           # Phase 2: S3-compatible object storage
+    # Caching (Phase 2)
+    "redis>=5.2.0",           # Redis client with async support
+    "hiredis>=3.0.0",         # C parser for performance
     # Validation & Settings
     "pydantic>=2.10.0",
     "pydantic-settings>=2.6.0",
@@ -75,6 +78,7 @@ select = [
 ]
 ignore = [
     "E501",   # line too long (handled by black)
+    "B008",   # function call in default argument (FastAPI Depends pattern)
 ]
 
 [tool.ruff.lint.isort]

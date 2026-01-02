@@ -1,7 +1,6 @@
 """File validation utilities."""
 
-from app.schemas.error import ErrorDetail, ErrorCodes
-
+from app.schemas.error import ErrorCodes, ErrorDetail
 
 # Magic bytes for image formats
 IMAGE_SIGNATURES = {

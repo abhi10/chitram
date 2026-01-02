@@ -1,6 +1,5 @@
 """API tests for image endpoints."""
 
-import pytest
 from httpx import AsyncClient
 
 

@@ -30,6 +30,16 @@ class Settings(BaseSettings):
     minio_bucket: str = "images"
     minio_secure: bool = False  # True for HTTPS
 
+    # Redis Configuration (Phase 2)
+    redis_host: str = "localhost"
+    redis_port: int = 6379
+    redis_password: str | None = None
+    redis_db: int = 0
+    cache_enabled: bool = True
+    cache_ttl_seconds: int = 3600  # 1 hour default
+    cache_key_prefix: str = "chitram"
+    cache_debug: bool = False  # Log cache operations when True
+
     # Application
     app_env: str = "development"
     debug: bool = True

@@ -2,7 +2,7 @@
 
 **Repository:** https://github.com/abhi10/chitram
 **Current Phase:** Phase 2 (Full Features)
-**Last Updated:** 2026-01-01
+**Last Updated:** 2026-01-02
 
 ---
 
@@ -128,12 +128,17 @@
 - [x] **Dependency Cleanup:**
   - [x] Removed duplicate `[dependency-groups]` section from pyproject.toml
   - [x] Added missing deps: pillow, pytest, pytest-asyncio, pytest-cov, aiosqlite
-- [ ] **Redis Caching:**
-  - [ ] Add Redis to docker-compose.yml
-  - [ ] Add Redis dependency
-  - [ ] Create cache service layer
-  - [ ] Cache metadata queries (TTL: 1 hour)
-  - [ ] Cache invalidation on delete
+- [x] **Redis Caching:** ✅ Complete (ADR-0009)
+  - [x] Add Redis to docker-compose.yml (with health check, persistence)
+  - [x] Add Redis dependency (redis>=5.2.0, hiredis>=3.0.0)
+  - [x] Create cache service layer (Cache-Aside pattern)
+  - [x] Cache metadata queries (TTL: 1 hour, configurable)
+  - [x] Cache invalidation on delete
+  - [x] X-Cache response header (HIT/MISS/DISABLED)
+  - [x] Graceful degradation (system works without Redis)
+  - [x] Health endpoint reports cache status
+  - [x] Unit tests (19 tests with mocking)
+  - [x] Integration tests (11 tests, auto-skip without Redis)
 - [ ] **Rate Limiting:**
   - [ ] Redis-backed rate limiter
   - [ ] 10 requests/IP/minute
@@ -150,9 +155,9 @@
   - [ ] 🟡 Add logging for silent storage deletion failures (orphan tracking)
   - [ ] 🟡 Consider streaming uploads (defer to Phase 3 if complex)
 - [ ] **Testing & Validation:**
-  - [ ] All Phase 1 functionality preserved
-  - [ ] Storage switching works
-  - [ ] Cache hit/miss working
+  - [x] All Phase 1 functionality preserved
+  - [x] Storage switching works
+  - [x] Cache hit/miss working (X-Cache header)
   - [ ] Rate limits enforced
 
 ### Week 2: Auth & Background Jobs
@@ -549,7 +554,7 @@ git push origin --delete feature/phase-X.X
 - **Requirements:**
   - `requirements.md` - Phase 1 requirements
   - `requirements-phase2.md` - Phase 2 requirements (EARS format)
-- **ADRs:** `docs/adr/` (9 decisions documented)
+- **ADRs:** `docs/adr/` (10 decisions documented)
 - **CI/CD:** `.github/workflows/ci.yml` - GitHub Actions pipeline
 
 ### Archived Documents
@@ -559,6 +564,7 @@ git push origin --delete feature/phase-X.X
   - One-time code reviews
 
 ### Key ADRs
+- **ADR-0009:** Redis caching for metadata (Cache-Aside pattern)
 - **ADR-0008:** Phase 1 Lean approach (defer complexity)
 - **ADR-0007:** Use GitHub Codespaces
 - **ADR-0006:** No Kubernetes for MVP
@@ -577,17 +583,20 @@ git push origin --delete feature/phase-X.X
 **Phase 2 - In Progress:**
 1. ✅ MinIO Backend - Complete & Validated in Codespaces!
 2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
-3. ⏳ Redis caching layer (Next)
-4. ⏳ Rate limiting implementation
+3. ✅ Redis caching layer - Complete with Cache-Aside pattern!
+4. ⏳ Rate limiting implementation (Next)
 5. ⏳ User authentication (JWT)
 6. ⏳ Background jobs (Celery)
 
-**Completed (Phase 2 - MinIO + CI):**
+**Completed (Phase 2 - MinIO + CI + Redis):**
 - ✅ MinioStorageBackend implementation (Strategy Pattern)
-- ✅ Docker Compose with MinIO service
+- ✅ Docker Compose with MinIO + Redis services
 - ✅ Configuration-based backend selection
-- ✅ Unit tests (11) + Integration tests (9) + API tests (11)
-- ✅ All 31 tests passing in Codespaces
+- ✅ Redis caching with Cache-Aside pattern (ADR-0009)
+- ✅ X-Cache header (HIT/MISS/DISABLED)
+- ✅ Graceful degradation when Redis unavailable
+- ✅ Unit tests (19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
+- ✅ All 43+ tests passing
 - ✅ GitHub Actions CI workflow (lint, test, dependency-check)
 - ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
 - ✅ Codespaces Runbook + Phase 2 Retrospective docs
@@ -621,7 +630,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 
 **Current Status:** 🟢 On track
 **Blockers:** None
-**Last Updated:** 2026-01-01
+**Last Updated:** 2026-01-02
 
 ---
 
@@ -637,7 +646,8 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2026-01-01:** Phase 2 MinIO validated in Codespaces (31 tests passing)
 - [x] **2026-01-01:** GitHub Actions CI pipeline added
 - [x] **2026-01-01:** Phase 2 Retrospective documented (6 issues, 4 blockers resolved)
-- [ ] **In Progress:** Phase 2 Redis caching + Rate limiting
+- [x] **2026-01-02:** Phase 2 Redis caching complete (ADR-0009, 43+ tests passing)
+- [ ] **In Progress:** Phase 2 Rate limiting
 - [ ] **Next:** Phase 2 Auth + Background Jobs
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability

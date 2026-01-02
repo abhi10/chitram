@@ -183,7 +183,7 @@ class MinioStorageBackend(StorageBackend):
                     response.release_conn()
             except S3Error as e:
                 if e.code == "NoSuchKey":
-                    raise FileNotFoundError(f"File not found: {key}")
+                    raise FileNotFoundError(f"File not found: {key}") from e
                 raise
 
         return await asyncio.to_thread(_get)

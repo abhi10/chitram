@@ -10,8 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database import Base, get_db
 from app.main import app
-from app.services.storage_service import StorageService, LocalStorageBackend
-
+from app.services.cache_service import set_cache
+from app.services.storage_service import LocalStorageBackend, StorageService
 
 # Test database URL (in-memory SQLite for tests)
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
@@ -81,7 +81,9 @@ def test_storage(tmp_path) -> StorageService:
 
 
 @pytest.fixture
-async def client(test_db: AsyncSession, test_storage: StorageService) -> AsyncGenerator[AsyncClient, None]:
+async def client(
+    test_db: AsyncSession, test_storage: StorageService
+) -> AsyncGenerator[AsyncClient, None]:
     """Create async test client with overridden dependencies."""
 
     # Override database dependency
@@ -93,9 +95,15 @@ async def client(test_db: AsyncSession, test_storage: StorageService) -> AsyncGe
     # Override storage in app state
     app.state.storage = test_storage
 
+    # Disable cache for API tests (cache tested separately)
+    app.state.cache = None
+    set_cache(None)
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     # Clear overrides
     app.dependency_overrides.clear()
+    app.state.cache = None
+    set_cache(None)

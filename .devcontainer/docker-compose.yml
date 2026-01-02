@@ -15,10 +15,17 @@ services:
       - MINIO_SECRET_KEY=minioadmin
       - MINIO_BUCKET=images
       - MINIO_SECURE=false
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_ENABLED=true
+      - CACHE_TTL_SECONDS=3600
+      - CACHE_DEBUG=true
     depends_on:
       postgres:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     command: sleep infinity
 
@@ -55,6 +62,20 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres-data:
   minio-data:
+  redis-data:

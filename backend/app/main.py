@@ -1,25 +1,27 @@
 """FastAPI application entry point."""
 
-from contextlib import asynccontextmanager
 from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.config import get_settings
-from app.database import init_db, close_db
-from app.api.images import router as images_router
+# SQLAlchemy exceptions for database error handling
+from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
+
 from app.api.health import router as health_router
-from app.schemas.error import ErrorResponse, ErrorDetail, ErrorCodes
+from app.api.images import router as images_router
+from app.config import get_settings
+from app.database import close_db, init_db
+from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
+from app.services.cache_service import CacheService, set_cache
 from app.services.storage_service import (
-    StorageService,
     LocalStorageBackend,
     MinioStorageBackend,
+    StorageService,
 )
-
-# SQLAlchemy exceptions for database error handling
-from sqlalchemy.exc import OperationalError, TimeoutError as SQLAlchemyTimeoutError
 
 settings = get_settings()
 
@@ -48,12 +50,45 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
         print("✅ Storage initialized (local filesystem)")
 
+    # Store storage service in app state
+    app.state.storage = StorageService(backend=storage_backend)
+
+    # Initialize Redis cache (Phase 2)
+    cache_service: CacheService | None = None
+    if settings.cache_enabled:
+        cache_service = CacheService(
+            host=settings.redis_host,
+            port=settings.redis_port,
+            password=settings.redis_password,
+            db=settings.redis_db,
+            key_prefix=settings.cache_key_prefix,
+            default_ttl=settings.cache_ttl_seconds,
+        )
+        connected = await cache_service.connect()
+        if connected:
+            print("✅ Redis cache connected")
+        else:
+            print("⚠️ Redis cache unavailable - running without cache")
+            cache_service = None
+    else:
+        print("ℹ️ Cache disabled by configuration")
+
+    # Store cache service in app state and global
+    app.state.cache = cache_service
+    set_cache(cache_service)
+
     print("✅ Image Hosting API ready!")
 
     yield
 
     # Shutdown
     print("👋 Shutting down...")
+
+    # Close cache connection
+    if cache_service:
+        await cache_service.close()
+        print("✅ Redis connection closed")
+
     await close_db()
     print("✅ Database connections closed")
 
