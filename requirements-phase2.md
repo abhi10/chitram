@@ -76,6 +76,36 @@ This document defines the functional and non-functional requirements for Phase 2
 | FR-2.2.3b | The system shall use a configurable cache TTL (default: 3600 seconds) | Should | ⏳ Pending |
 | FR-2.2.3c | The system shall use a key prefix to namespace cache entries (e.g., `chitram:image:{id}`) | Should | ⏳ Pending |
 
+#### FR-2.2.4: Cache Validation & Testing
+| ID | EARS Requirement | Priority | Status |
+|----|------------------|----------|--------|
+| FR-2.2.4a | **When** the application starts, the system shall verify Redis connectivity and log status | Should | ⏳ Pending |
+| FR-2.2.4b | Health check endpoint shall report Redis connection status (`"cache": "connected"` or `"cache": "disconnected"`) | Must | ⏳ Pending |
+| FR-2.2.4c | The system shall expose cache statistics endpoint (`GET /api/v1/admin/cache/stats`) with hit/miss counts | Could | ⏳ Pending |
+| FR-2.2.4d | **When** `CACHE_DEBUG=true`, the system shall log cache operations (get, set, invalidate) | Should | ⏳ Pending |
+
+#### FR-2.2.5: Cache Testing Strategy
+| Test Type | Description | Verification Method |
+|-----------|-------------|---------------------|
+| **Unit Tests** | Mock Redis client, verify cache service logic | `pytest tests/unit/test_cache_service.py` |
+| **Integration Tests** | Real Redis container, verify get/set/delete | `pytest tests/integration/test_redis_integration.py` |
+| **API Tests** | Verify cache headers, response times | Check `X-Cache: HIT` or `X-Cache: MISS` header |
+| **Load Tests** | Verify cache improves response time | Compare p95 latency with/without cache |
+| **Failover Tests** | Stop Redis, verify graceful degradation | System continues serving from DB |
+
+#### FR-2.2.6: Cache Validation Checklist
+| # | Validation Step | Expected Result |
+|---|-----------------|-----------------|
+| 1 | Start app with Redis running | Log: "✅ Redis connected" |
+| 2 | Upload image, check Redis | Key `chitram:image:{id}` exists |
+| 3 | GET metadata twice | First: DB query, Second: cache hit |
+| 4 | Check response header | `X-Cache: MISS` then `X-Cache: HIT` |
+| 5 | DELETE image | Cache key removed |
+| 6 | GET deleted image | 404, no cache entry |
+| 7 | Stop Redis, GET metadata | Fallback to DB, no error |
+| 8 | Health check without Redis | `"cache": "disconnected"` |
+| 9 | Wait TTL (1 hour), GET again | Cache miss, re-fetch from DB |
+
 ---
 
 ### FR-2.3: Rate Limiting
