@@ -95,7 +95,7 @@ class TestRateLimiterIntegration:
         test_ip = "192.168.1.101"
 
         # Make 10 requests (all allowed)
-        for i in range(10):
+        for _ in range(10):
             result = await rate_limiter.check(test_ip)
             assert result.allowed is True
 
