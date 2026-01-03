@@ -16,6 +16,9 @@ class Settings(BaseSettings):
 
     # Database
     database_url: str = "postgresql+asyncpg://app:localdev@localhost:5432/imagehost"
+    db_pool_size: int = 5  # Number of persistent connections
+    db_max_overflow: int = 10  # Additional connections allowed beyond pool_size
+    db_pool_recycle: int = 3600  # Recycle connections after 1 hour (seconds)
 
     # Storage Backend
     storage_backend: str = "local"  # "local" or "minio"
@@ -29,6 +32,7 @@ class Settings(BaseSettings):
     minio_secret_key: str = "minioadmin"
     minio_bucket: str = "images"
     minio_secure: bool = False  # True for HTTPS
+    minio_startup_timeout: float = 10.0  # Timeout for bucket check at startup (seconds)
 
     # Redis Configuration (Phase 2)
     redis_host: str = "localhost"

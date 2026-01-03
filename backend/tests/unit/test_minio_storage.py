@@ -3,6 +3,10 @@
 These tests use mocking to test the MinioStorageBackend class without
 requiring an actual MinIO server. For integration tests with a real
 MinIO server, see tests/integration/test_minio_integration.py.
+
+Note: Bucket initialization tests have been moved to test_performance_fixes.py
+since the async factory method (MinioStorageBackend.create()) is now the
+preferred initialization pattern.
 """
 
 from unittest.mock import MagicMock, patch
@@ -14,94 +18,34 @@ from app.services.storage_service import MinioStorageBackend
 
 
 class TestMinioStorageBackendInit:
-    """Tests for MinioStorageBackend initialization."""
+    """Tests for MinioStorageBackend basic initialization.
+
+    Note: Bucket initialization tests (async factory method, timeout behavior)
+    are in test_performance_fixes.py::TestMinioAsyncTimeout.
+    """
 
     @patch("app.services.storage_service.Minio")
-    def test_init_creates_bucket_if_not_exists(self, mock_minio_class):
-        """Backend creates bucket if it doesn't exist."""
+    def test_init_creates_client_with_correct_params(self, mock_minio_class):
+        """Backend creates MinIO client with correct parameters."""
         mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = False
         mock_minio_class.return_value = mock_client
 
-        MinioStorageBackend(
+        backend = MinioStorageBackend(
             endpoint="localhost:9000",
             access_key="testkey",
             secret_key="testsecret",
             bucket="test-bucket",
-            secure=False,
+            secure=True,
         )
 
-        mock_client.bucket_exists.assert_called_once_with("test-bucket")
-        mock_client.make_bucket.assert_called_once_with("test-bucket")
-
-    @patch("app.services.storage_service.Minio")
-    def test_init_skips_bucket_creation_if_exists(self, mock_minio_class):
-        """Backend skips bucket creation if it already exists."""
-        mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = True
-        mock_minio_class.return_value = mock_client
-
-        MinioStorageBackend(
-            endpoint="localhost:9000",
+        mock_minio_class.assert_called_once_with(
+            "localhost:9000",
             access_key="testkey",
             secret_key="testsecret",
-            bucket="test-bucket",
-            secure=False,
+            secure=True,
         )
-
-        mock_client.bucket_exists.assert_called_once_with("test-bucket")
-        mock_client.make_bucket.assert_not_called()
-
-    @patch("app.services.storage_service.Minio")
-    def test_init_handles_bucket_already_owned_error(self, mock_minio_class):
-        """Backend handles BucketAlreadyOwnedByYou error gracefully."""
-        mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = False
-        error = S3Error(
-            code="BucketAlreadyOwnedByYou",
-            message="Bucket already exists",
-            resource="test-bucket",
-            request_id="test-request",
-            host_id="test-host",
-            response=MagicMock(),
-        )
-        mock_client.make_bucket.side_effect = error
-        mock_minio_class.return_value = mock_client
-
-        # Should not raise
-        MinioStorageBackend(
-            endpoint="localhost:9000",
-            access_key="testkey",
-            secret_key="testsecret",
-            bucket="test-bucket",
-            secure=False,
-        )
-
-    @patch("app.services.storage_service.Minio")
-    def test_init_raises_other_s3_errors(self, mock_minio_class):
-        """Backend raises non-BucketAlreadyOwnedByYou S3 errors."""
-        mock_client = MagicMock()
-        mock_client.bucket_exists.return_value = False
-        error = S3Error(
-            code="AccessDenied",
-            message="Access denied",
-            resource="test-bucket",
-            request_id="test-request",
-            host_id="test-host",
-            response=MagicMock(),
-        )
-        mock_client.make_bucket.side_effect = error
-        mock_minio_class.return_value = mock_client
-
-        with pytest.raises(S3Error) as exc_info:
-            MinioStorageBackend(
-                endpoint="localhost:9000",
-                access_key="testkey",
-                secret_key="testsecret",
-                bucket="test-bucket",
-                secure=False,
-            )
-        assert exc_info.value.code == "AccessDenied"
+        assert backend.bucket == "test-bucket"
+        assert backend.client is mock_client
 
 
 class TestMinioStorageBackendSave:

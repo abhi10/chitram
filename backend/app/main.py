@@ -40,12 +40,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     # Initialize storage backend based on configuration
     if settings.storage_backend == "minio":
-        storage_backend = MinioStorageBackend(
+        storage_backend = await MinioStorageBackend.create(
             endpoint=settings.minio_endpoint,
             access_key=settings.minio_access_key,
             secret_key=settings.minio_secret_key,
             bucket=settings.minio_bucket,
             secure=settings.minio_secure,
+            startup_timeout=settings.minio_startup_timeout,
         )
         print("✅ Storage initialized (MinIO)")
     else:
