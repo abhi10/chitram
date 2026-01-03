@@ -147,10 +147,14 @@
   - [x] Health endpoint reports rate limiter status
   - [x] Unit tests (22 tests with mocking)
   - [x] Rate limiting disabled in test fixtures
-- [ ] **Concurrency Control:** (from Graphiti patterns)
-  - [ ] Add `asyncio.Semaphore` for concurrent upload limits
-  - [ ] Prevent file collision on simultaneous uploads
-  - [ ] Configure `SEMAPHORE_LIMIT` in settings
+- [x] **Concurrency Control:** ✅ Complete (ADR-0010)
+  - [x] Add `asyncio.Semaphore` for concurrent upload limits (default: 10)
+  - [x] Acquire semaphore before `file.read()` (memory optimization)
+  - [x] Return 503 if wait exceeds timeout threshold
+  - [x] Configure `UPLOAD_CONCURRENCY_LIMIT` and `UPLOAD_CONCURRENCY_TIMEOUT` in settings
+  - [x] Health endpoint reports concurrency status
+  - [x] Unit tests (12 tests in `tests/unit/test_concurrency.py`)
+  - [x] DRY refactor: shared dependencies in `app/api/dependencies.py`
 - [ ] **Technical Debt & Performance Fixes:**
   - [ ] 🔴 Fix sync Pillow blocking event loop (`asyncio.to_thread()` in `get_image_dimensions`)
   - [ ] 🔴 Add rate limiting (DoS prevention) - covered in Rate Limiting above
@@ -158,23 +162,65 @@
   - [ ] 🟡 Make MinIO bucket check async with timeout (startup resilience)
   - [ ] 🟡 Add logging for silent storage deletion failures (orphan tracking)
   - [ ] 🟡 Consider streaming uploads (defer to Phase 3 if complex)
-- [x] **Testing & Validation:** ✅ 83 tests passing
+- [x] **Testing & Validation:** ✅ 99 tests passing
   - [x] All Phase 1 functionality preserved
   - [x] Storage switching works
   - [x] Cache hit/miss working (X-Cache header)
   - [x] Rate limits enforced (429 + Retry-After)
+  - [x] Concurrency control enforced (503 on timeout)
 
 ### Rate Limiting Testing Checklist
+> **Note:** Tests 2-8 are automated in `tests/integration/test_rate_limiter_integration.py`
+
 | # | Test | Expected Result | Status |
 |---|------|-----------------|--------|
-| 1 | Start app with Redis | Log: "✅ Rate limiter enabled (Redis-backed)" | ⬜ |
-| 2 | Upload 10 images quickly | All succeed (200/201) | ⬜ |
-| 3 | Upload 11th image | 429 Too Many Requests | ⬜ |
-| 4 | Check response headers | `Retry-After: <seconds>` present | ⬜ |
-| 5 | Wait for window reset | Next upload succeeds | ⬜ |
-| 6 | Stop Redis, upload image | Request allowed (fail-open) | ⬜ |
-| 7 | Health check | `"rate_limiter": "enabled"` | ⬜ |
-| 8 | Set `RATE_LIMIT_ENABLED=false` | Unlimited requests allowed | ⬜ |
+| 1 | Start app with Redis | Log: "✅ Rate limiter enabled (Redis-backed)" | ⬜ Manual |
+| 2 | Upload 10 images quickly | All succeed (200/201) | ✅ Automated |
+| 3 | Upload 11th image | 429 Too Many Requests | ✅ Automated |
+| 4 | Check response headers | `Retry-After: <seconds>` present | ✅ Automated |
+| 5 | Wait for window reset | Next upload succeeds | ✅ Automated |
+| 6 | Stop Redis, upload image | Request allowed (fail-open) | ✅ Automated |
+| 7 | Health check | `"rate_limiter": "enabled"` | ✅ Automated |
+| 8 | Set `RATE_LIMIT_ENABLED=false` | Unlimited requests allowed | ✅ Automated |
+
+### Concurrency Control Testing Checklist
+> **Note:** Tests 2-7 are automated in `tests/unit/test_concurrency.py` (12 tests)
+
+| # | Test | Expected Result | Status |
+|---|------|-----------------|--------|
+| 1 | Start app | Log: "✅ Upload concurrency limit: 10" | ⬜ Manual |
+| 2 | Upload single image | Succeeds normally (201) | ✅ Automated |
+| 3 | Acquire within limit | All acquire calls succeed | ✅ Automated |
+| 4 | Concurrent acquires respect limit | Only N succeed for limit=N | ✅ Automated |
+| 5 | Exceed timeout | Returns False (503 in API) | ✅ Automated |
+| 6 | Release allows new acquire | Slot freed after release | ✅ Automated |
+| 7 | Health check | Reports `active/limit` status | ✅ Automated |
+| 8 | Set `UPLOAD_CONCURRENCY_LIMIT=5` | Only 5 concurrent uploads allowed | ⬜ Manual |
+| 9 | Set `UPLOAD_CONCURRENCY_TIMEOUT=5` | 503 after 5s wait | ⬜ Manual |
+| 10 | Memory check during uploads | Peak memory bounded by limit × 5MB | ⬜ Manual |
+
+**Testing Commands:**
+```bash
+# Simulate concurrent uploads (requires parallel or xargs)
+seq 15 | xargs -P 15 -I {} curl -X POST -F "file=@test.jpg" http://localhost:8000/api/v1/images/upload
+
+# Or use Python script for precise control
+python -c "
+import asyncio
+import httpx
+
+async def upload(n):
+    async with httpx.AsyncClient() as client:
+        with open('test.jpg', 'rb') as f:
+            r = await client.post('http://localhost:8000/api/v1/images/upload', files={'file': f})
+            print(f'{n}: {r.status_code}')
+
+async def main():
+    await asyncio.gather(*[upload(i) for i in range(15)])
+
+asyncio.run(main())
+"
+```
 
 ### Week 2: Auth & Background Jobs
 - [ ] **User Authentication:**
@@ -580,6 +626,7 @@ git push origin --delete feature/phase-X.X
   - One-time code reviews
 
 ### Key ADRs
+- **ADR-0010:** Concurrency control for uploads (asyncio.Semaphore)
 - **ADR-0009:** Redis caching for metadata (Cache-Aside pattern)
 - **ADR-0008:** Phase 1 Lean approach (defer complexity)
 - **ADR-0007:** Use GitHub Codespaces
@@ -601,10 +648,11 @@ git push origin --delete feature/phase-X.X
 2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
 3. ✅ Redis caching layer - Complete with Cache-Aside pattern!
 4. ✅ Rate limiting - Complete with fail-open design!
-5. ⏳ User authentication (JWT) - Next
-6. ⏳ Background jobs (Celery)
+5. ✅ Concurrency control - Complete with ADR-0010!
+6. ⏳ User authentication (JWT) - Next
+7. ⏳ Background jobs (Celery)
 
-**Completed (Phase 2 - MinIO + CI + Redis + Rate Limiting):**
+**Completed (Phase 2 - MinIO + CI + Redis + Rate Limiting + Concurrency):**
 - ✅ MinioStorageBackend implementation (Strategy Pattern)
 - ✅ Docker Compose with MinIO + Redis services
 - ✅ Configuration-based backend selection
@@ -613,8 +661,10 @@ git push origin --delete feature/phase-X.X
 - ✅ Graceful degradation when Redis unavailable
 - ✅ Rate limiting (10 req/IP/min, 429 + Retry-After)
 - ✅ Fail-open design for rate limiter
-- ✅ Unit tests (22 rate limiter + 19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
-- ✅ All 83 tests passing
+- ✅ Concurrency control (10 concurrent uploads, 503 on timeout) - ADR-0010
+- ✅ Shared API dependencies module (`app/api/dependencies.py`)
+- ✅ Unit tests (12 concurrency + 22 rate limiter + 19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
+- ✅ All 99 tests passing
 - ✅ GitHub Actions CI workflow (lint, test, dependency-check)
 - ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
 - ✅ Codespaces Runbook + Phase 2 Retrospective docs
@@ -666,6 +716,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2026-01-01:** Phase 2 Retrospective documented (6 issues, 4 blockers resolved)
 - [x] **2026-01-02:** Phase 2 Redis caching complete (ADR-0009, 43+ tests passing)
 - [x] **2026-01-02:** Phase 2 Rate limiting complete (83 tests passing)
+- [x] **2026-01-02:** Phase 2 Concurrency control complete (ADR-0010, 99 tests passing)
 - [ ] **Next:** Phase 2 Auth + Background Jobs
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability

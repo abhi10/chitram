@@ -6,11 +6,13 @@ from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import get_cache, get_rate_limiter, get_upload_semaphore
 from app.config import get_settings
 from app.database import get_db
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
 from app.services.cache_service import CacheService
+from app.services.concurrency import UploadSemaphore
 from app.services.image_service import ImageService
 from app.services.rate_limiter import RateLimiter
 from app.services.storage_service import StorageService
@@ -23,11 +25,6 @@ settings = get_settings()
 def get_storage(request: Request) -> StorageService:
     """Dependency to get storage service from app state."""
     return request.app.state.storage
-
-
-def get_cache(request: Request) -> CacheService | None:
-    """Dependency to get cache service from app state."""
-    return getattr(request.app.state, "cache", None)
 
 
 def get_image_service(
@@ -46,11 +43,6 @@ def get_client_ip(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()
     return request.client.host if request.client else "unknown"
-
-
-def get_rate_limiter(request: Request) -> RateLimiter | None:
-    """Dependency to get rate limiter from app state."""
-    return getattr(request.app.state, "rate_limiter", None)
 
 
 async def check_rate_limit(
@@ -90,6 +82,7 @@ async def check_rate_limit(
     responses={
         400: {"model": ErrorResponse, "description": "Invalid file"},
         429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
+        503: {"model": ErrorResponse, "description": "Server busy"},
     },
     dependencies=[Depends(check_rate_limit)],
 )
@@ -97,51 +90,71 @@ async def upload_image(
     request: Request,
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
+    semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
 ) -> ImageUploadResponse:
     """
     Upload a new image.
 
     Accepts JPEG and PNG files up to 5MB.
+    Returns 503 if server is too busy (concurrency limit reached).
     """
-    # Read file content
-    content = await file.read()
+    # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
+    if semaphore:
+        acquired = await semaphore.acquire_with_timeout()
+        if not acquired:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail=ErrorDetail(
+                    code=ErrorCodes.SERVICE_UNAVAILABLE,
+                    message="Server busy, try again later.",
+                    details={"reason": "upload_concurrency_limit_exceeded"},
+                ).model_dump(),
+            )
 
-    # Validate file
-    validation_error = validate_image_file(
-        content=content,
-        content_type=file.content_type,
-        filename=file.filename or "unnamed",
-        max_size=settings.max_file_size_bytes,
-        allowed_types=settings.allowed_content_types_list,
-    )
-    if validation_error:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail=validation_error.model_dump(),
+    try:
+        # Read file content (now protected by semaphore)
+        content = await file.read()
+
+        # Validate file
+        validation_error = validate_image_file(
+            content=content,
+            content_type=file.content_type,
+            filename=file.filename or "unnamed",
+            max_size=settings.max_file_size_bytes,
+            allowed_types=settings.allowed_content_types_list,
+        )
+        if validation_error:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=validation_error.model_dump(),
+            )
+
+        # Get client IP
+        client_ip = get_client_ip(request)
+
+        # Upload image
+        image = await service.upload(
+            data=content,
+            filename=file.filename or "unnamed",
+            content_type=file.content_type or "application/octet-stream",
+            upload_ip=client_ip,
         )
 
-    # Get client IP
-    client_ip = get_client_ip(request)
-
-    # Upload image
-    image = await service.upload(
-        data=content,
-        filename=file.filename or "unnamed",
-        content_type=file.content_type or "application/octet-stream",
-        upload_ip=client_ip,
-    )
-
-    # Build response
-    return ImageUploadResponse(
-        id=image.id,
-        filename=image.filename,
-        content_type=image.content_type,
-        file_size=image.file_size,
-        url=f"/api/v1/images/{image.id}/file",
-        created_at=image.created_at,
-        width=image.width,
-        height=image.height,
-    )
+        # Build response
+        return ImageUploadResponse(
+            id=image.id,
+            filename=image.filename,
+            content_type=image.content_type,
+            file_size=image.file_size,
+            url=f"/api/v1/images/{image.id}/file",
+            created_at=image.created_at,
+            width=image.width,
+            height=image.height,
+        )
+    finally:
+        # Always release semaphore
+        if semaphore:
+            semaphore.release()
 
 
 @router.get(
