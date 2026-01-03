@@ -61,6 +61,11 @@ class Settings(BaseSettings):
     max_file_size_mb: int = 5
     allowed_content_types: str = "image/jpeg,image/png"
 
+    # JWT Authentication (Phase 2A)
+    jwt_secret_key: str = "CHANGE_ME_IN_PRODUCTION"  # Required in production
+    jwt_algorithm: str = "HS256"
+    jwt_expire_minutes: int = 1440  # 24 hours
+
     @property
     def max_file_size_bytes(self) -> int:
         """Max file size in bytes."""

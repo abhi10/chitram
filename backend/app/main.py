@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 
+from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.images import router as images_router
 from app.config import get_settings
@@ -190,4 +191,5 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
 
 # Include routers
 app.include_router(health_router)
+app.include_router(auth_router)
 app.include_router(images_router, prefix="/api/v1")

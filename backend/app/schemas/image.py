@@ -53,3 +53,5 @@ class ImageUploadResponse(BaseModel):
     # Phase 1.5: Image dimensions (optional for backward compatibility)
     width: int | None = None
     height: int | None = None
+    # Phase 2A: Delete token for anonymous uploads (only returned once)
+    delete_token: str | None = None

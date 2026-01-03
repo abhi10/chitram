@@ -222,52 +222,170 @@ asyncio.run(main())
 "
 ```
 
-### Week 2: Auth & Background Jobs
-- [ ] **User Authentication:**
-  - [ ] Create users table
-  - [ ] JWT token implementation
-  - [ ] Registration endpoint
-  - [ ] Login endpoint
-  - [ ] Protected routes
-  - [ ] Add user_id to images table
-- [ ] **Delete Tokens:**
-  - [ ] Generate secure token on upload
-  - [ ] Store in database (encrypted)
-  - [ ] Require token for deletion
-  - [ ] Token expiration
-- [ ] **Background Jobs (Celery):**
-  - [ ] Add Celery dependency
-  - [ ] Setup Celery worker
-  - [ ] Thumbnail generation task (3 sizes)
-  - [ ] Image optimization task
-  - [ ] Checksum calculation
-  - [ ] Update docker-compose.yml
+### Phase 2A: User Authentication (ADR-0011)
+
+**Goal:** Enable user ownership of images and secure deletion.
+
+**Why This Matters for Users:**
+- Own their images (track uploads, manage gallery)
+- Secure deletion (only owner can delete)
+- Foundation for per-user features (quotas, sharing)
+
+- [ ] **Database & Models:**
+  - [ ] Create `users` table (id, email, password_hash, is_active, is_admin, created_at)
+  - [ ] Add `user_id` FK to `images` table (nullable for anonymous)
+  - [ ] Add `delete_token_hash` to `images` table
+  - [ ] Create Alembic migration
+  - [ ] Update SQLAlchemy models
+- [ ] **Authentication Service:**
+  - [ ] Add dependencies: `python-jose`, `passlib[bcrypt]`
+  - [ ] Create `app/services/auth_service.py`
+  - [ ] Password hashing with bcrypt (work factor 12)
+  - [ ] JWT token generation (HS256, 24h expiry)
+  - [ ] JWT token validation
+- [ ] **Auth Endpoints:**
+  - [ ] `POST /api/v1/auth/register` - Create account
+  - [ ] `POST /api/v1/auth/login` - Get JWT token
+  - [ ] `GET /api/v1/users/me` - Current user profile
+  - [ ] `GET /api/v1/users/me/images` - List user's images
+- [ ] **Delete Token System:**
+  - [ ] Generate secure token on anonymous upload (32 bytes, URL-safe)
+  - [ ] Return `delete_token` in upload response (anonymous only)
+  - [ ] Store hash in database (not plaintext)
+  - [ ] Require token for anonymous image deletion
+  - [ ] Skip token check if authenticated user owns image
+- [ ] **Protected Routes:**
+  - [ ] `Depends(get_current_user)` for protected endpoints
+  - [ ] `DELETE /api/v1/images/{id}` - Require ownership OR delete token
+  - [ ] Return 401 for missing/invalid JWT
+  - [ ] Return 403 for wrong owner/token
+- [ ] **Configuration:**
+  - [ ] `JWT_SECRET_KEY` environment variable (required)
+  - [ ] `JWT_ALGORITHM` (default: HS256)
+  - [ ] `JWT_EXPIRE_MINUTES` (default: 1440 = 24h)
+- [ ] **Testing:**
+  - [ ] Unit tests for auth service
+  - [ ] API tests for auth endpoints
+  - [ ] Integration tests for protected routes
+- [ ] **Security Testing:** (See ADR-0011)
+  - [ ] Password Security:
+    - [ ] Verify bcrypt hash format (`$2b$` prefix)
+    - [ ] Verify work factor ≥ 12 (timing: 200-400ms)
+    - [ ] No plaintext passwords in logs/responses
+  - [ ] JWT Security:
+    - [ ] Required claims present (sub, exp, iat)
+    - [ ] Expired tokens rejected (401)
+    - [ ] Invalid signatures rejected (401)
+    - [ ] Algorithm confusion prevented (only HS256)
+  - [ ] API Security:
+    - [ ] No user enumeration (same error for wrong email/password)
+    - [ ] Rate limiting on `/auth/*` endpoints
+    - [ ] Timing-safe comparisons
+  - [ ] Delete Token Security:
+    - [ ] 32-byte cryptographically random tokens
+    - [ ] Hash stored in DB (not plaintext)
+    - [ ] Timing-safe token comparison
+  - [ ] OWASP Alignment:
+    - [ ] A01: Access control tested
+    - [ ] A02: Password hashing verified
+    - [ ] A07: No credentials in logs
+- [ ] **Validation & Merge:**
+  - [ ] All auth tests passing
+  - [ ] Anonymous uploads still work (backward compatible)
+  - [ ] Merge to main, tag `v0.2.0-auth`
+
+**Branch:** `feature2/phase2-auth`
+**ADR:** [ADR-0011: User Authentication with JWT](docs/adr/0011-user-authentication-jwt.md)
+
+---
+
+### Phase 2B: Background Jobs (ADR-0012)
+
+**Goal:** Improve upload UX by processing thumbnails/checksums asynchronously.
+
+**Why This Matters for Users:**
+- **Before:** Upload takes 4-6 seconds (blocking on thumbnail generation)
+- **After:** Upload completes in <1 second, thumbnails appear shortly after
+
+**Real-World Use Cases:**
+1. **Thumbnail Generation:** User uploads photo, gets instant response, thumbnails generated in background
+2. **Checksum Calculation:** SHA-256 hash computed async for data integrity verification
+3. **Image Deduplication:** Perceptual hash detects duplicate uploads (future)
+
+- [ ] **Infrastructure Setup:**
+  - [ ] Add Celery dependency (`celery[redis]>=5.3.0`)
+  - [ ] Create `app/celery_app.py` with Redis broker config
+  - [ ] Create `app/celeryconfig.py` for task settings
+  - [ ] Add Celery worker to `docker-compose.yml`
+- [ ] **Thumbnail Generation Task:**
+  - [ ] Create `app/tasks/thumbnails.py`
+  - [ ] Generate 3 sizes: small (150px), medium (300px), large (600px)
+  - [ ] Maintain aspect ratio
+  - [ ] Store thumbnails in same storage backend as originals
+  - [ ] Update image record with thumbnail keys
+  - [ ] Retry up to 3 times with exponential backoff
+- [ ] **Checksum Calculation Task:**
+  - [ ] Create `app/tasks/checksum.py`
+  - [ ] Calculate SHA-256 hash of image data
+  - [ ] Store checksum in database
+  - [ ] Queue after successful upload
+- [ ] **API Integration:**
+  - [ ] Queue thumbnail job after upload
+  - [ ] Add `thumbnails_ready` field to image response
+  - [ ] `GET /api/v1/images/{id}/thumbnails` - Get thumbnail URLs
+  - [ ] Handle "not ready yet" gracefully
+- [ ] **Database Updates:**
+  - [ ] Add `checksum` column to images table
+  - [ ] Add `thumbnail_keys` JSON column
+  - [ ] Add `thumbnails_ready` boolean column
+  - [ ] Create Alembic migration
+- [ ] **Configuration:**
+  - [ ] `CELERY_BROKER_URL` (default: redis://localhost:6379/1)
+  - [ ] `CELERY_RESULT_BACKEND` (default: redis://localhost:6379/2)
+  - [ ] Task rate limits configurable
+- [ ] **Monitoring:**
+  - [ ] Add Flower for web-based monitoring (optional)
+  - [ ] Health check includes Celery worker status
+  - [ ] Log task success/failure with timing
+- [ ] **Testing:**
+  - [ ] Unit tests for tasks (mocked)
+  - [ ] Integration tests with real Celery worker
+  - [ ] Verify upload response time < 1 second
+- [ ] **Validation & Merge:**
+  - [ ] All background job tests passing
+  - [ ] Thumbnails generate correctly
+  - [ ] Upload UX significantly faster
+  - [ ] Merge to main, tag `v0.2.0-jobs`
+
+**Branch:** `feature2/phase2-background-jobs`
+**ADR:** [ADR-0012: Background Jobs with Celery](docs/adr/0012-background-jobs-celery.md)
+
+---
+
+### Phase 2C: Advanced Features (Optional)
+
+**Goal:** Nice-to-have features if time permits.
+
 - [ ] **Image Deduplication:**
-  - [ ] Evaluate imagededup library (CNN/hashing-based)
-  - [ ] Store perceptual hash on upload
-  - [ ] Find duplicates endpoint (`GET /images/{id}/duplicates`)
+  - [ ] Evaluate `imagededup` library (CNN/hashing-based)
+  - [ ] Store perceptual hash on upload (background job)
+  - [ ] `GET /api/v1/images/{id}/duplicates` - Find similar images
   - [ ] Optional: Block duplicate uploads
   - [ ] Reference: https://deepwiki.com/idealo/imagededup/7-usage-examples
 - [ ] **Advanced Validation:**
-  - [ ] Restore python-magic library
-  - [ ] Better file type detection
-- [ ] **Model Updates:**
-  - [ ] Add fields: user_id, is_public, updated_at, checksum
-  - [ ] Create Alembic migration
-  - [ ] Update schemas
-- [ ] **Final Validation:**
-  - [ ] All features working together
-  - [ ] Performance testing
-  - [ ] Documentation updated
-- [ ] **Merge & Tag:**
-  - [ ] Merge to main
+  - [ ] Restore `python-magic` library
+  - [ ] Enhanced file type detection
+  - [ ] Validate Content-Type matches magic bytes
+- [ ] **Image Optimization:**
+  - [ ] Compress images in background job
+  - [ ] Keep original, serve optimized
+  - [ ] Track storage savings
+- [ ] **Final Phase 2 Tag:**
+  - [ ] All features integrated
+  - [ ] Performance testing complete
   - [ ] Tag `v0.2.0`
 
-**Branch:** `feature/phase-2`
-**Time Estimate:** 1-2 weeks
-**Blockers:** None
-
-**Reference:** `docs/phase-execution-plan.md` lines 173-286
+**Branch:** `feature2/phase2-advanced`
 
 ---
 
