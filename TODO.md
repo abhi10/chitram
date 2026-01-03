@@ -1,21 +1,23 @@
 # Chitram - TODO List & Progress Tracker
 
 **Repository:** https://github.com/abhi10/chitram
-**Current Phase:** Phase 2 (Full Features)
-**Last Updated:** 2026-01-02
+**Current Phase:** Phase 2 Complete - Ready for Phase 3 (Web UI)
+**Last Updated:** 2026-01-03
 
 ---
 
 ## 🎯 Quick Status
 
-| Phase | Status | Branch | Duration | Notes |
-|-------|--------|--------|----------|-------|
-| **Phase 1 Lean** | ✅ Complete | `main` | 2-3 days | Validated 2025-12-24 |
-| **Phase 1.5** | ✅ Complete | `main` | ~4 hours | Merged 2025-12-31 |
-| **Phase 2** | 🟡 In Progress | `feature/phase-2` | 1-2 weeks | Full features |
-| **Phase 3** | ⏸️ Pending | `feature/phase-3` | 2-3 weeks | Scaling |
-| **Phase 4** | ⏸️ Pending | `feature/phase-4` | 1 week | Observability |
-| **UI Layer** | 📋 Planning | `chitram-web` | TBD | Optional frontend (after Phase 2) |
+| Phase | Status | Branch | Description |
+|-------|--------|--------|-------------|
+| **Phase 1 Lean** | ✅ Complete | `main` | Core CRUD, validated 2025-12-24 |
+| **Phase 1.5** | ✅ Complete | `main` | Alembic + Pillow, merged 2025-12-31 |
+| **Phase 2A** | ✅ Complete | `feature2/phase2A-auth` | User Auth (JWT), 151 tests |
+| **Phase 2B** | ✅ Complete | `feature2/phase-2-redis-minio` | Thumbnails (FastAPI BackgroundTasks), 188 tests |
+| **Phase 3** | 📋 Planned | `feature/phase-3-ui` | Web UI (HTMX + Jinja2) |
+| **Phase 4** | ⏸️ Future | `feature/phase-4` | Advanced Features (Celery, Dedup) |
+| **Phase 5** | ⏸️ Future | `feature/phase-5` | Horizontal Scaling |
+| **Phase 6** | ⏸️ Future | `feature/phase-6` | Observability (Prometheus, Grafana)
 
 ---
 
@@ -301,104 +303,227 @@ asyncio.run(main())
 
 ---
 
-### Phase 2B: Background Jobs (ADR-0012)
+### Phase 2B: Background Tasks - Thumbnails (ADR-0012 Revised)
 
-**Goal:** Improve upload UX by processing thumbnails/checksums asynchronously.
+**Goal:** Generate thumbnails asynchronously using FastAPI BackgroundTasks.
+**Status:** ✅ Complete (188 tests passing)
+**Branch:** `feature2/phase-2-redis-minio`
+
+> **Scope Change:** Celery infrastructure deferred to Phase 4. Using built-in FastAPI BackgroundTasks for simplicity.
 
 **Why This Matters for Users:**
-- **Before:** Upload takes 4-6 seconds (blocking on thumbnail generation)
-- **After:** Upload completes in <1 second, thumbnails appear shortly after
+- Gallery loads faster with 300px thumbnails instead of 5MB originals
+- Upload response remains fast (~500ms)
 
-**Real-World Use Cases:**
-1. **Thumbnail Generation:** User uploads photo, gets instant response, thumbnails generated in background
-2. **Checksum Calculation:** SHA-256 hash computed async for data integrity verification
-3. **Image Deduplication:** Perceptual hash detects duplicate uploads (future)
+- [x] **Implementation:**
+  - [x] Add `thumbnail_key` column to images table (migration: `42cb2a9fa7a2`)
+  - [x] Create Alembic migration
+  - [x] Create `app/services/thumbnail_service.py`
+  - [x] Generate single thumbnail (300px max dimension, maintain aspect ratio)
+  - [x] Store thumbnail in same storage backend as original (prefix: `thumbs/`)
+  - [x] Update image record with thumbnail key
+  - [x] Use `asyncio.to_thread()` for CPU-bound Pillow operations
+- [x] **API Integration:**
+  - [x] Use `BackgroundTasks` in upload endpoint
+  - [x] Add `thumbnail_ready: boolean` to image response
+  - [x] Add `thumbnail_url` to image response (when ready)
+  - [x] `GET /api/v1/images/{id}/thumbnail` - Return thumbnail or 404
+  - [x] Add `THUMBNAIL_NOT_READY` error code
+- [x] **Error Handling:**
+  - [x] Log thumbnail failures (graceful degradation)
+  - [x] Original image always available as fallback
+  - [x] Return 404 with appropriate error codes (IMAGE_NOT_FOUND, THUMBNAIL_NOT_READY)
+- [x] **Testing:** (37 new tests)
+  - [x] Unit tests for thumbnail service (25 tests)
+  - [x] API tests for thumbnail endpoint (12 tests)
+  - [x] Verify upload response time unchanged
+- [x] **Validation & Merge:**
+  - [x] All 188 tests passing
+  - [x] Thumbnails generating correctly
+  - [ ] Merge to main, tag `v0.2.0-thumbnails`
 
-- [ ] **Infrastructure Setup:**
-  - [ ] Add Celery dependency (`celery[redis]>=5.3.0`)
-  - [ ] Create `app/celery_app.py` with Redis broker config
-  - [ ] Create `app/celeryconfig.py` for task settings
-  - [ ] Add Celery worker to `docker-compose.yml`
-- [ ] **Thumbnail Generation Task:**
-  - [ ] Create `app/tasks/thumbnails.py`
-  - [ ] Generate 3 sizes: small (150px), medium (300px), large (600px)
-  - [ ] Maintain aspect ratio
-  - [ ] Store thumbnails in same storage backend as originals
-  - [ ] Update image record with thumbnail keys
-  - [ ] Retry up to 3 times with exponential backoff
-- [ ] **Checksum Calculation Task:**
-  - [ ] Create `app/tasks/checksum.py`
-  - [ ] Calculate SHA-256 hash of image data
-  - [ ] Store checksum in database
-  - [ ] Queue after successful upload
-- [ ] **API Integration:**
-  - [ ] Queue thumbnail job after upload
-  - [ ] Add `thumbnails_ready` field to image response
-  - [ ] `GET /api/v1/images/{id}/thumbnails` - Get thumbnail URLs
-  - [ ] Handle "not ready yet" gracefully
-- [ ] **Database Updates:**
-  - [ ] Add `checksum` column to images table
-  - [ ] Add `thumbnail_keys` JSON column
-  - [ ] Add `thumbnails_ready` boolean column
-  - [ ] Create Alembic migration
-- [ ] **Configuration:**
-  - [ ] `CELERY_BROKER_URL` (default: redis://localhost:6379/1)
-  - [ ] `CELERY_RESULT_BACKEND` (default: redis://localhost:6379/2)
-  - [ ] Task rate limits configurable
-- [ ] **Monitoring:**
-  - [ ] Add Flower for web-based monitoring (optional)
-  - [ ] Health check includes Celery worker status
-  - [ ] Log task success/failure with timing
-- [ ] **Testing:**
-  - [ ] Unit tests for tasks (mocked)
-  - [ ] Integration tests with real Celery worker
-  - [ ] Verify upload response time < 1 second
-- [ ] **Validation & Merge:**
-  - [ ] All background job tests passing
-  - [ ] Thumbnails generate correctly
-  - [ ] Upload UX significantly faster
-  - [ ] Merge to main, tag `v0.2.0-jobs`
-
-**Branch:** `feature2/phase2-background-jobs`
-**ADR:** [ADR-0012: Background Jobs with Celery](docs/adr/0012-background-jobs-celery.md)
+**ADR:** [ADR-0012: Background Tasks Strategy](docs/adr/0012-background-jobs-celery.md)
 
 ---
 
-### Phase 2C: Advanced Features (Optional)
+## 🌐 Phase 3 - Web UI (PLANNED)
 
-**Goal:** Nice-to-have features if time permits.
+**Goal:** Add web-based user interface using HTMX and Jinja2 templates
+**Status:** 📋 Planned
+**Branch:** `feature/phase-3-ui`
+**Prerequisites:** Phase 2A Auth complete ✅, Phase 2B Thumbnails (optional but recommended)
 
-- [ ] **Image Deduplication:**
-  - [ ] Evaluate `imagededup` library (CNN/hashing-based)
-  - [ ] Store perceptual hash on upload (background job)
-  - [ ] `GET /api/v1/images/{id}/duplicates` - Find similar images
-  - [ ] Optional: Block duplicate uploads
-  - [ ] Reference: https://deepwiki.com/idealo/imagededup/7-usage-examples
-- [ ] **Advanced Validation:**
-  - [ ] Restore `python-magic` library
-  - [ ] Enhanced file type detection
-  - [ ] Validate Content-Type matches magic bytes
-- [ ] **Image Optimization:**
-  - [ ] Compress images in background job
-  - [ ] Keep original, serve optimized
-  - [ ] Track storage savings
-- [ ] **Final Phase 2 Tag:**
-  - [ ] All features integrated
-  - [ ] Performance testing complete
-  - [ ] Tag `v0.2.0`
+> **Architecture Decision:** HTMX + Jinja2 + TailwindCSS in monorepo. See [ADR-0013](docs/adr/0013-web-ui-htmx.md).
 
-**Branch:** `feature2/phase2-advanced`
+**Why This Matters for Users:**
+- Visual gallery to browse images
+- Easy upload via drag-and-drop
+- User dashboard to manage their images
+
+### Public Pages
+- [ ] **Home Page (Gallery):**
+  - [ ] Display gallery grid of recent public images
+  - [ ] Show thumbnails (300px) for fast loading
+  - [ ] Infinite scroll or pagination
+  - [ ] Click to navigate to image detail
+- [ ] **Image Detail Page:**
+  - [ ] Display full-size image
+  - [ ] Show metadata (filename, size, dimensions, upload date)
+  - [ ] "Copy Link" button
+  - [ ] Delete button (if owner)
+- [ ] **Navigation Bar:**
+  - [ ] Present on all pages
+  - [ ] Links: Home, Upload, Login/Register (or Profile if logged in)
+  - [ ] Show user email when authenticated
+
+### Authentication Pages
+- [ ] **Registration Page:**
+  - [ ] Email + password form
+  - [ ] Client-side email validation
+  - [ ] Redirect to home on success
+  - [ ] Inline error display
+- [ ] **Login Page:**
+  - [ ] Email + password form
+  - [ ] Store JWT in httpOnly cookie
+  - [ ] Redirect to home on success
+  - [ ] Link to registration
+- [ ] **Logout:**
+  - [ ] Clear JWT token
+  - [ ] Redirect to home
+
+### Upload Page
+- [ ] **Upload Form:**
+  - [ ] File input with drag-and-drop
+  - [ ] File preview before upload
+  - [ ] Validate file type (JPEG/PNG only)
+  - [ ] Validate file size (max 5MB)
+- [ ] **Upload Progress:**
+  - [ ] Progress indicator during upload
+  - [ ] Redirect to image detail on success
+  - [ ] Error message on failure
+- [ ] **Anonymous Upload:**
+  - [ ] Display delete token prominently
+  - [ ] Warning: "Save this token! It's the only way to delete this image."
+
+### User Dashboard
+- [ ] **My Images Page:**
+  - [ ] Display all images uploaded by current user
+  - [ ] Delete button on each image
+  - [ ] Confirmation dialog before delete
+
+### Technical Implementation
+- [ ] **Templates Structure:**
+  - [ ] Create `backend/app/templates/` directory
+  - [ ] `base.html` - Layout with TailwindCSS
+  - [ ] `home.html` - Gallery grid
+  - [ ] `upload.html` - Upload form
+  - [ ] `image.html` - Image detail
+  - [ ] `login.html`, `register.html` - Auth forms
+  - [ ] `my_images.html` - User dashboard
+  - [ ] `partials/` - HTMX fragments
+- [ ] **Static Assets:**
+  - [ ] `backend/app/static/css/styles.css` - TailwindCSS output
+  - [ ] `backend/app/static/js/htmx.min.js` - HTMX library
+- [ ] **Route Handlers:**
+  - [ ] Create `backend/app/api/web.py` for template routes
+  - [ ] HTMX for partial page updates
+  - [ ] CSRF protection on all forms
+- [ ] **Security:**
+  - [ ] JWT stored in httpOnly cookies (not localStorage)
+  - [ ] CSRF protection enabled
+  - [ ] XSS prevention (sanitize user input)
+- [ ] **Responsive Design:**
+  - [ ] Mobile, tablet, desktop layouts
+  - [ ] Gallery grid adjusts to viewport
+  - [ ] Hamburger menu on mobile
+
+### Testing
+- [ ] Template route tests
+- [ ] HTMX interaction tests
+- [ ] Responsive design verification
+- [ ] Accessibility checks (alt text, labels, keyboard nav)
+
+### Validation & Merge
+- [ ] All tests passing
+- [ ] UI works on mobile/tablet/desktop
+- [ ] Merge to main, tag `v0.3.0-ui`
+
+**Requirements:** [requirements-phase3.md](./requirements-phase3.md)
+**ADR:** [ADR-0013: Web UI with HTMX](docs/adr/0013-web-ui-htmx.md)
 
 ---
 
-## 🚀 Phase 3 - Horizontal Scaling (FUTURE)
+## 🔧 Phase 4 - Advanced Features (FUTURE)
+
+**Goal:** Add advanced backend features deferred from earlier phases
+**Status:** ⏸️ Not started
+**Branch:** `feature/phase-4`
+**Prerequisites:** Phase 3 complete
+
+> **Note:** Features moved here from Phase 2B/2C to keep earlier phases lean.
+
+### Celery + Redis for Background Jobs (ADR-0012)
+- [ ] **Infrastructure:**
+  - [ ] Add Celery to docker-compose.yml
+  - [ ] Configure Redis as message broker
+  - [ ] Celery worker process
+  - [ ] Flower for job monitoring (optional)
+- [ ] **Multiple Thumbnail Sizes:**
+  - [ ] Generate 3 sizes: 150px, 300px, 600px
+  - [ ] Store all thumbnails in same storage backend
+  - [ ] Update API to return all thumbnail URLs
+- [ ] **Retry with Exponential Backoff:**
+  - [ ] Configure retry policy for failed tasks
+  - [ ] Dead letter queue for permanent failures
+
+### Checksum Calculation (SHA-256)
+- [ ] **Implementation:**
+  - [ ] Calculate SHA-256 hash during upload
+  - [ ] Store hash in database
+  - [ ] API endpoint to verify file integrity
+- [ ] **Use Cases:**
+  - [ ] Detect corrupted uploads
+  - [ ] Cache validation
+  - [ ] Deduplication foundation
+
+### Image Deduplication
+- [ ] **Hash-based Deduplication:**
+  - [ ] Check if identical image already exists (by hash)
+  - [ ] Return existing image instead of re-storing
+  - [ ] Track reference count for shared storage
+- [ ] **Perceptual Hashing (Optional):**
+  - [ ] Detect visually similar images
+  - [ ] Use imagededup library
+  - [ ] Near-duplicate detection
+
+### User Features
+- [ ] `GET /api/v1/users/me/images` - List user's images (paginated)
+- [ ] User quota management (storage limits)
+- [ ] Image sharing/visibility controls
+
+### Testing
+- [ ] Celery task tests
+- [ ] Checksum verification tests
+- [ ] Deduplication tests
+
+### Validation & Merge
+- [ ] All tests passing
+- [ ] Celery jobs processing correctly
+- [ ] Merge to main, tag `v0.4.0`
+
+**Reference:** [ADR-0012](docs/adr/0012-background-jobs-celery.md) (Phase 4 section)
+
+---
+
+## 🚀 Phase 5 - Horizontal Scaling (FUTURE)
 
 **Goal:** Scale to 1000s of concurrent users
 **Status:** ⏸️ Not started
-**Prerequisites:** Phase 2 complete
+**Branch:** `feature/phase-5`
+**Prerequisites:** Phase 4 complete
 
 ### Implementation Checklist
-- [ ] **Create feature branch** - `git checkout -b feature/phase-3`
+- [ ] **Create feature branch** - `git checkout -b feature/phase-5`
 - [ ] **Load Balancer (Nginx):**
   - [ ] Add Nginx to docker-compose
   - [ ] Configure round-robin
@@ -434,24 +559,21 @@ asyncio.run(main())
   - [ ] 10x Phase 2 load capacity
 - [ ] **Merge & Tag:**
   - [ ] Merge to main
-  - [ ] Tag `v0.3.0`
+  - [ ] Tag `v0.5.0`
 
-**Branch:** `feature/phase-3` (to be created)
-**Time Estimate:** 2-3 weeks
-**Blockers:** Phase 2 complete
-
-**Reference:** `docs/phase-execution-plan.md` lines 288-413
+**Reference:** `docs/archive/phase-execution-plan.md`
 
 ---
 
-## 📊 Phase 4 - Observability (FUTURE)
+## 📊 Phase 6 - Observability (FUTURE)
 
 **Goal:** Production-ready monitoring and reliability
 **Status:** ⏸️ Not started
-**Prerequisites:** Phase 3 complete
+**Branch:** `feature/phase-6`
+**Prerequisites:** Phase 5 complete
 
 ### Implementation Checklist
-- [ ] **Create feature branch** - `git checkout -b feature/phase-4`
+- [ ] **Create feature branch** - `git checkout -b feature/phase-6`
 - [ ] **Prometheus & Grafana:**
   - [ ] Deploy Prometheus server
   - [ ] Add instrumentation to API
@@ -490,130 +612,7 @@ asyncio.run(main())
   - [ ] Merge to main
   - [ ] Tag `v1.0.0` (Production Ready!)
 
-**Branch:** `feature/phase-4` (to be created)
-**Time Estimate:** 1 week
-**Blockers:** Phase 3 complete
-
-**Reference:** `docs/phase-execution-plan.md` lines 415-502
-
----
-
-## 🌐 Future: UI Layer (chitram-web)
-
-**Goal:** Optional web frontend for the Chitram API
-**Status:** 📋 Planning (not started)
-**Prerequisites:** Phase 2 complete (Auth required for user-specific galleries)
-**Repository:** `github.com/abhi10/chitram-web` (to be created)
-
-### Architecture Decision
-
-```
-┌─────────────────────┐         ┌─────────────────────┐
-│    chitram-web      │  HTTP   │      chitram        │
-│    (Frontend)       │────────▶│      (API)          │
-│                     │         │                     │
-│  - Gallery UI       │         │  - REST endpoints   │
-│  - Upload form      │         │  - Auth (JWT)       │
-│  - User dashboard   │         │  - Storage          │
-└─────────────────────┘         └─────────────────────┘
-```
-
-### Option Evaluation
-
-| Option | Stack | Effort | Pros | Cons |
-|--------|-------|--------|------|------|
-| **A: HTMX + Jinja2** | Python (same repo) | ~1 day | No JS build, fast, simple | Limited interactivity |
-| **B: React SPA** | TypeScript, Vite | ~1 week | Rich UX, component ecosystem | Separate build, complexity |
-| **C: Next.js** | TypeScript, React | ~1 week | SSR, SEO, API routes | Node.js runtime needed |
-| **D: FastAPI-Admin** | Python plugin | ~2 hours | Quick admin CRUD | Not user-facing |
-
-**Recommendation:** Start with **Option A (HTMX)** for quick validation, migrate to **Option B/C** if richer UX needed.
-
-### Planned Features (Phase 5+)
-
-- [ ] **Public Pages:**
-  - [ ] Home page with recent uploads
-  - [ ] Image detail page (`/image/{id}`)
-  - [ ] Public gallery view
-- [ ] **User Features (requires Phase 2 Auth):**
-  - [ ] User registration/login
-  - [ ] Personal gallery (`/my-images`)
-  - [ ] Upload form with drag-and-drop
-  - [ ] Batch upload support
-  - [ ] Image management (delete, visibility toggle)
-- [ ] **Admin Features:**
-  - [ ] Dashboard with stats
-  - [ ] User management
-  - [ ] Storage usage monitoring
-  - [ ] Moderation tools
-- [ ] **UX Enhancements:**
-  - [ ] Responsive design (mobile-first)
-  - [ ] Dark mode toggle
-  - [ ] Image lightbox/preview
-  - [ ] Copy link to clipboard
-  - [ ] Share buttons
-
-### Tech Stack (Option A - HTMX)
-
-```
-chitram-web/ (or chitram/frontend/)
-├── templates/
-│   ├── base.html           # Layout with TailwindCSS
-│   ├── home.html           # Gallery grid
-│   ├── upload.html         # Upload form
-│   ├── image.html          # Image detail
-│   └── partials/           # HTMX fragments
-│       ├── gallery-item.html
-│       └── upload-progress.html
-├── static/
-│   ├── css/
-│   └── js/
-└── routes/
-    └── web.py              # Jinja2 template routes
-```
-
-### Tech Stack (Option B - React)
-
-```
-chitram-web/
-├── src/
-│   ├── components/
-│   │   ├── Gallery.tsx
-│   │   ├── ImageCard.tsx
-│   │   ├── UploadForm.tsx
-│   │   └── Navbar.tsx
-│   ├── pages/
-│   │   ├── Home.tsx
-│   │   ├── Upload.tsx
-│   │   └── Image.tsx
-│   ├── hooks/
-│   │   └── useApi.ts
-│   └── App.tsx
-├── package.json
-└── vite.config.ts
-```
-
-### API Integration Points
-
-| Frontend Action | API Endpoint | Notes |
-|-----------------|--------------|-------|
-| Load gallery | `GET /api/v1/images/` | Paginated list |
-| View image | `GET /api/v1/images/{id}` | Metadata |
-| Display image | `GET /api/v1/images/{id}/file` | Binary stream |
-| Upload | `POST /api/v1/images/upload` | Multipart form |
-| Delete | `DELETE /api/v1/images/{id}` | Requires auth (Phase 2) |
-| Login | `POST /api/v1/auth/login` | Phase 2 |
-| Register | `POST /api/v1/auth/register` | Phase 2 |
-
-### When to Start
-
-```
-Now (Phase 1-2):     API-only, use Swagger UI for testing
-After Phase 2:       Option A (HTMX) for quick demo
-After Phase 3:       Option B/C if production UI needed
-```
-
-**Decision:** Defer until Phase 2 Auth is complete. API-first approach allows any frontend later.
+**Reference:** `docs/archive/phase-execution-plan.md`
 
 ---
 
@@ -736,7 +735,8 @@ git push origin --delete feature/phase-X.X
 - **Requirements:**
   - `requirements.md` - Phase 1 requirements
   - `requirements-phase2.md` - Phase 2 requirements (EARS format)
-- **ADRs:** `docs/adr/` (10 decisions documented)
+  - `requirements-phase3.md` - Phase 3 UI requirements (EARS format)
+- **ADRs:** `docs/adr/` (13 decisions documented)
 - **CI/CD:** `.github/workflows/ci.yml` - GitHub Actions pipeline
 
 ### Archived Documents
@@ -746,7 +746,8 @@ git push origin --delete feature/phase-X.X
   - One-time code reviews
 
 ### Key ADRs
-- **ADR-0012:** Background Jobs with Celery (proposed)
+- **ADR-0013:** Web UI with HTMX (Phase 3)
+- **ADR-0012:** Background Tasks Strategy (FastAPI BackgroundTasks → Celery in Phase 4)
 - **ADR-0011:** User Authentication with JWT (implemented)
 - **ADR-0010:** Concurrency control for uploads (asyncio.Semaphore)
 - **ADR-0009:** Redis caching for metadata (Cache-Aside pattern)
@@ -765,14 +766,17 @@ git push origin --delete feature/phase-X.X
 
 ## 🎯 Current Focus
 
-**Phase 2 - In Progress:**
+**Phase 2 - Complete:**
 1. ✅ MinIO Backend - Complete & Validated in Codespaces!
 2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
 3. ✅ Redis caching layer - Complete with Cache-Aside pattern!
 4. ✅ Rate limiting - Complete with fail-open design!
 5. ✅ Concurrency control - Complete with ADR-0010!
-6. ⏳ User authentication (JWT) - Next
-7. ⏳ Background jobs (Celery)
+6. ✅ User authentication (JWT) - Complete (151 tests)!
+7. ✅ Thumbnails (FastAPI BackgroundTasks) - Complete (188 tests)!
+
+**Up Next:**
+- Phase 3: Web UI (HTMX + Jinja2)
 
 **Completed (Phase 2 - MinIO + CI + Redis + Rate Limiting + Concurrency):**
 - ✅ MinioStorageBackend implementation (Strategy Pattern)
@@ -809,18 +813,21 @@ git push origin --delete feature/phase-X.X
 ## 📊 Progress Summary
 
 ```
-Timeline: 8 weeks total (2 months)
+Phase Roadmap:
 
-Week 1-2:   Phase 1 Lean ✅ (Complete - Validated 2025-12-24)
-Week 2:     Phase 1.5 ✅ (Complete - Merged 2025-12-31)
-Week 3-4:   Phase 2 🟡 (In Progress)
-Week 5-7:   Phase 3 ⏸️ (Not started)
-Week 8:     Phase 4 ⏸️ (Not started)
+Phase 1 Lean    ✅ Complete (Validated 2025-12-24)
+Phase 1.5       ✅ Complete (Merged 2025-12-31)
+Phase 2A Auth   ✅ Complete (151 tests, 2026-01-03)
+Phase 2B        ✅ Complete (188 tests, 2026-01-03)
+Phase 3         📋 Next - Web UI (HTMX + Jinja2)
+Phase 4         ⏸️ Future - Advanced Features (Celery, Dedup)
+Phase 5         ⏸️ Future - Horizontal Scaling
+Phase 6         ⏸️ Future - Observability
 ```
 
 **Current Status:** 🟢 On track
 **Blockers:** None
-**Last Updated:** 2026-01-02
+**Last Updated:** 2026-01-03
 
 ---
 
@@ -840,9 +847,13 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2026-01-02:** Phase 2 Rate limiting complete (83 tests passing)
 - [x] **2026-01-02:** Phase 2 Concurrency control complete (ADR-0010, 99 tests passing)
 - [x] **2026-01-02:** Phase 2 Technical debt fixes complete (114 tests passing)
-- [ ] **Next:** Phase 2 Auth + Background Jobs
-- [ ] **Next:** Phase 3 horizontal scaling
-- [ ] **Next:** Phase 4 observability
+- [x] **2026-01-03:** Phase 2A Auth complete (ADR-0011, 151 tests passing)
+- [x] **2026-01-03:** Phase restructuring - Phase 3 (UI), Phase 4 (Advanced), Phase 5 (Scaling), Phase 6 (Observability)
+- [x] **2026-01-03:** Phase 2B Thumbnails complete (FastAPI BackgroundTasks, 37 new tests, 188 total)
+- [ ] **Next:** Phase 3 Web UI (HTMX + Jinja2)
+- [ ] **Future:** Phase 4 Advanced Features (Celery, Dedup)
+- [ ] **Future:** Phase 5 Horizontal Scaling
+- [ ] **Future:** Phase 6 Observability
 - [ ] **Target:** v1.0.0 production-ready system
 
 ---

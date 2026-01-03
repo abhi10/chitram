@@ -74,8 +74,13 @@ uv run ruff check --fix .         # Lint
 - `docs/phase-execution-plan.md` - Tactical execution plan (Phase 1→1.5→2→3→4)
 
 ### Architecture Decisions
-- `docs/adr/` - Architecture Decision Records (8 ADRs)
-- Latest: ADR-0008 - Phase 1 Lean (defer complexity)
+- `docs/adr/` - Architecture Decision Records (14 ADRs)
+- Key ADRs:
+  - ADR-0014 - Test Dependency Container (production-test symmetry)
+  - ADR-0012 - Background Tasks Strategy (FastAPI BackgroundTasks)
+  - ADR-0011 - User Authentication with JWT
+  - ADR-0010 - Concurrency Control for Uploads
+  - ADR-0009 - Redis Caching for Metadata
 
 ### Implementation Guides
 - `docs/development-workflow.md` - Dev workflow guide
@@ -153,6 +158,36 @@ raise HTTPException(
 )
 ```
 **Why:** Consistent error format for API consumers (ADR-0005)
+
+### 6. Test Dependency Container (conftest.py) - ADR-0014
+```python
+@dataclass
+class TestDependencies:
+    """Mirrors app.state - all deps visible and controllable."""
+    engine: object
+    session_maker: async_sessionmaker
+    session: AsyncSession
+    storage: StorageService
+    thumbnail_service: ThumbnailService
+
+@pytest.fixture
+async def test_deps(test_storage) -> TestDependencies:
+    # Create all deps with SHARED session_factory
+    session_maker = async_sessionmaker(engine, ...)
+    thumbnail_service = ThumbnailService(
+        storage=test_storage,
+        session_factory=session_maker,  # Same factory!
+    )
+    return TestDependencies(...)
+
+@pytest.fixture
+async def client(test_deps: TestDependencies):
+    # Wire up app.state from container (mirrors main.py lifespan)
+    app.state.thumbnail_service = test_deps.thumbnail_service
+```
+**Why:** Services that run outside request lifecycle (BackgroundTasks) need session_factory. Test container ensures they use shared DB, not production global.
+
+**Pattern:** Production uses `app.state` as container, tests use `TestDependencies`. Both explicit and mirrored.
 
 ## Important File Locations
 

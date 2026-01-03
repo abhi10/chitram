@@ -191,28 +191,41 @@ This document defines the functional and non-functional requirements for Phase 2
 
 ---
 
-### FR-2.6: Background Jobs
+### FR-2.6: Background Tasks (Lean)
 
-#### FR-2.6.1: Job Queue Infrastructure
+> **Note:** This section was simplified per ADR-0012 revision. Celery infrastructure deferred to Phase 4.
+> Using FastAPI BackgroundTasks for minimal complexity.
+
+#### FR-2.6.1: Background Task Infrastructure
 | ID | EARS Requirement | Priority |
 |----|------------------|----------|
-| FR-2.6.1a | The system shall use Celery with Redis as message broker for background tasks | Must |
-| FR-2.6.1b | Background jobs shall run in separate worker processes | Must |
-| FR-2.6.1c | **If** a job fails, the system shall retry up to 3 times with exponential backoff | Should |
+| FR-2.6.1a | The system shall use FastAPI BackgroundTasks for non-blocking post-upload processing | Must |
+| FR-2.6.1b | Background tasks shall run in the same process after response is sent | Must |
+| FR-2.6.1c | **If** a background task fails, the API response shall not be affected | Must |
 
-#### FR-2.6.2: Thumbnail Generation
+#### FR-2.6.2: Thumbnail Generation (Single Size)
 | ID | EARS Requirement | Priority |
 |----|------------------|----------|
-| FR-2.6.2a | **When** an image is uploaded, the system shall queue a thumbnail generation job | Should |
-| FR-2.6.2b | The system shall generate 3 thumbnail sizes: small (150px), medium (300px), large (600px) | Should |
+| FR-2.6.2a | **When** an image is uploaded, the system shall queue a thumbnail generation task | Should |
+| FR-2.6.2b | The system shall generate 1 thumbnail size: medium (300px max dimension) | Should |
 | FR-2.6.2c | Thumbnails shall maintain aspect ratio | Must |
 | FR-2.6.2d | Thumbnails shall be stored in the same storage backend as originals | Must |
+| FR-2.6.2e | **When** thumbnail is ready, the system shall update image record with thumbnail key | Should |
 
-#### FR-2.6.3: Checksum Calculation
+#### FR-2.6.3: Thumbnail Retrieval
 | ID | EARS Requirement | Priority |
 |----|------------------|----------|
-| FR-2.6.3a | **When** an image is uploaded, the system shall calculate and store SHA-256 checksum | Should |
-| FR-2.6.3b | Checksum calculation shall run as a background job (non-blocking) | Should |
+| FR-2.6.3a | `GET /api/v1/images/{id}/thumbnail` shall return the thumbnail if available | Should |
+| FR-2.6.3b | **If** thumbnail is not yet generated, the system shall return 404 with code `THUMBNAIL_NOT_READY` | Should |
+| FR-2.6.3c | Image metadata response shall include `thumbnail_ready: boolean` field | Should |
+
+#### FR-2.6.4: Deferred to Phase 4
+The following features are explicitly deferred to Phase 4 (Advanced Features):
+- Multiple thumbnail sizes (150px, 300px, 600px)
+- Celery with Redis broker for distributed processing
+- Retry with exponential backoff
+- Checksum calculation (SHA-256)
+- Job monitoring (Flower)
 
 ---
 
@@ -335,8 +348,9 @@ This document defines the functional and non-functional requirements for Phase 2
 |-------|------|--------|-------------|
 | user_id | UUID | Added | FK to users (nullable for anonymous) |
 | delete_token_hash | string | Added | Hashed delete token |
-| checksum | string | Added | SHA-256 hash |
-| thumbnail_keys | JSON | Added | Storage keys for thumbnails |
+| thumbnail_key | string | Added | Storage key for thumbnail (Phase 2B) |
+
+> **Deferred to Phase 4:** `checksum` (SHA-256), `thumbnail_keys` (JSON for multiple sizes)
 
 ---
 
@@ -362,27 +376,31 @@ Phase 2 is considered complete when:
 - [x] Rate limits stored in Redis
 - [x] Configurable limits (upload endpoint only for now)
 
-### Concurrency Control ⏳
-- [ ] Semaphore limits concurrent uploads (default: 10)
-- [ ] 503 returned when timeout exceeded
-- [ ] Memory optimized (acquire before file.read)
-- [ ] Configurable via environment variables
+### Concurrency Control ✅
+- [x] Semaphore limits concurrent uploads (default: 10)
+- [x] 503 returned when timeout exceeded
+- [x] Memory optimized (acquire before file.read)
+- [x] Configurable via environment variables
 
-### Authentication ⏳
-- [ ] User registration working
-- [ ] JWT login working
-- [ ] Protected routes require valid JWT
-- [ ] Image ownership enforced on delete
+### Authentication (Phase 2A) ✅
+- [x] User registration working
+- [x] JWT login working
+- [x] Protected routes require valid JWT
+- [x] Image ownership enforced on delete
 
-### Delete Tokens ⏳
-- [ ] Token generated on anonymous upload
-- [ ] Token required for anonymous delete
-- [ ] Token stored as hash
+### Delete Tokens (Phase 2A) ✅
+- [x] Token generated on anonymous upload
+- [x] Token required for anonymous delete
+- [x] Token stored as hash (SHA-256)
 
-### Background Jobs ⏳
-- [ ] Celery worker running
-- [ ] Thumbnail generation working
-- [ ] Job failures don't affect API
+### Background Tasks (Phase 2B) ✅
+- [x] FastAPI BackgroundTasks integrated
+- [x] Single thumbnail generation (300px)
+- [x] Task failures don't affect API response
+- [x] `thumbnail_ready` field in response
+- [x] `GET /api/v1/images/{id}/thumbnail` endpoint
+- [x] Unit tests for ThumbnailService (25 tests)
+- [x] API tests for thumbnail endpoint (12 tests)
 
 ### CI/CD ✅
 - [x] GitHub Actions running on PR
@@ -396,6 +414,9 @@ Phase 2 is considered complete when:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-01 | Initial Phase 2 requirements with EARS format |
+| 1.1 | 2026-01-03 | FR-2.6 simplified: FastAPI BackgroundTasks, single thumbnail, Celery deferred to Phase 4 |
+| 1.1 | 2026-01-03 | Updated acceptance criteria for Phase 2A (Auth) completion |
+| 1.2 | 2026-01-03 | Phase 2B (Thumbnails) complete: BackgroundTasks, ThumbnailService, endpoint, 37 tests |
 
 ---
 

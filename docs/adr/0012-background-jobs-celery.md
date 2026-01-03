@@ -1,222 +1,185 @@
-# ADR-0012: Background Jobs with Celery
+# ADR-0012: Background Tasks Strategy
 
 ## Status
 
-Proposed
+Accepted (Revised 2026-01-03)
 
 ## Date
 
-2026-01-02
+2026-01-02 (Original), 2026-01-03 (Revised)
 
 ## Context
 
-### The Problem: Synchronous Processing Bottleneck
+### The Problem: Post-Upload Processing
 
-Currently, image uploads are processed synchronously in the request-response cycle:
+After an image is uploaded, we want to generate thumbnails for faster gallery loading. The question is: how complex should this infrastructure be?
 
-```
-User Request ──► Upload ──► Validate ──► Store ──► [Response]
-                                           │
-                            ┌──────────────┴──────────────┐
-                            │ All processing blocks here: │
-                            │ • Thumbnail generation      │
-                            │ • Checksum calculation      │
-                            │ • Dimension extraction      │
-                            │ • Deduplication check       │
-                            └─────────────────────────────┘
-```
+### Original Proposal: Celery + Redis
 
-**Real Impact on Users:**
+The original ADR proposed Celery with Redis as message broker. Analysis revealed this was overengineering:
 
-| Task | Time | User Experience |
-|------|------|-----------------|
-| Upload 5MB image | ~500ms | Acceptable |
-| + Generate 3 thumbnails | +2-3s | Slow |
-| + Calculate SHA-256 | +200ms | Slow |
-| + CNN deduplication | +1-2s | Very slow |
-| **Total** | **4-6 seconds** | **Unacceptable** |
+| Scenario | Upload Time | User Experience |
+|----------|-------------|-----------------|
+| Current (no thumbnails) | ~500ms | Good |
+| + Thumbnail generation | +2-3s sync | Bad |
+| + Thumbnail async (any method) | ~500ms | Good |
 
-Users expect uploads to feel instant. Waiting 4-6 seconds for a single image upload is poor UX.
+**Key Insight:** Any async solution solves the UX problem. Celery's benefits (retries, distributed workers, persistence) aren't needed until we have:
+- Multiple thumbnail sizes
+- High volume (1000+ uploads/minute)
+- Need for job persistence across restarts
 
-### The Solution: Asynchronous Processing
+### Evolutionary Approach
 
-```
-User Request ──► Upload ──► Validate ──► Store ──► [Response: 201 Created]
-                                           │            │
-                                           │      User gets response
-                                           │      in ~500ms ✓
-                                           ▼
-                              ┌─────────────────────────┐
-                              │   Background Queue      │
-                              │   (Redis)               │
-                              └───────────┬─────────────┘
-                                          │
-                    ┌─────────────────────┼─────────────────────┐
-                    ▼                     ▼                     ▼
-              [Thumbnail Job]      [Checksum Job]      [Dedupe Job]
-                    │                     │                     │
-                    ▼                     ▼                     ▼
-              Save thumbnails      Update DB record      Find duplicates
-```
-
-**Now the user gets a response immediately**, and CPU-intensive work happens in the background.
+| Phase | Solution | When to Use |
+|-------|----------|-------------|
+| **Phase 2B** | FastAPI BackgroundTasks | Simple, no infra, good for MVP |
+| **Phase 4** | Celery + Redis | When scale requires distributed workers |
 
 ## Decision
 
-**Celery with Redis Broker** for background task processing.
+**Phase 2B: Use FastAPI BackgroundTasks** for thumbnail generation.
 
-### Why Celery?
+### Why FastAPI BackgroundTasks?
 
-| Option | Verdict | Reason |
-|--------|---------|--------|
-| **Celery + Redis** | ✅ Chosen | Mature, Redis already in stack, retries built-in |
-| FastAPI BackgroundTasks | ❌ | No persistence, no retries, same process |
-| Dramatiq | ❌ | Smaller community |
-| arq | ❌ | Less mature |
+| Aspect | FastAPI BackgroundTasks | Celery |
+|--------|-------------------------|--------|
+| Dependencies | Built-in (zero) | celery, redis, flower |
+| Infrastructure | None | Redis broker, worker process |
+| Complexity | ~10 lines | ~150 lines + docker service |
+| Retries | No | Yes |
+| Persistence | No (lost on restart) | Yes |
+| Distributed | No (same process) | Yes |
+| **Fit for Phase 2B** | ✅ Perfect | ❌ Overkill |
 
-### Architecture
-
-```
-┌────────────────────────────────────────────────────────────┐
-│                     Docker Compose                         │
-├────────────────────────────────────────────────────────────┤
-│                                                            │
-│  ┌──────────────┐     ┌──────────────┐     ┌────────────┐ │
-│  │   FastAPI    │     │    Redis     │     │   MinIO    │ │
-│  │   (API)      │◄───►│   (Broker +  │     │  (Storage) │ │
-│  │              │     │    Cache)    │     │            │ │
-│  └──────────────┘     └──────┬───────┘     └────────────┘ │
-│         │                    │                     ▲       │
-│         │                    │                     │       │
-│         │              ┌─────▼─────┐               │       │
-│         │              │  Celery   │───────────────┘       │
-│         └─────────────►│  Worker   │                       │
-│         (queue tasks)  │           │                       │
-│                        └───────────┘                       │
-│                                                            │
-│  ┌──────────────┐                                         │
-│  │  PostgreSQL  │◄──── (both API and Worker connect)      │
-│  │  (Database)  │                                         │
-│  └──────────────┘                                         │
-│                                                            │
-└────────────────────────────────────────────────────────────┘
-```
-
-## Implementation
-
-### Task Example
+### Implementation
 
 ```python
-@celery_app.task(bind=True, max_retries=3)
-def generate_thumbnails(self, image_id: str):
-    image = get_image(image_id)
-    for size in [(150, 150), (300, 300), (600, 600)]:
-        thumbnail = resize(image, size)
-        save_thumbnail(image_id, size, thumbnail)
-    update_db(image_id, thumbnails_ready=True)
+from fastapi import BackgroundTasks
+
+def generate_thumbnail(image_id: str, storage: StorageService, db: AsyncSession):
+    """Generate 300px thumbnail after upload."""
+    try:
+        # Load original image
+        data = await storage.get(f"{image_id}.jpg")
+
+        # Resize to 300px max dimension
+        img = Image.open(io.BytesIO(data))
+        img.thumbnail((300, 300), Image.Resampling.LANCZOS)
+
+        # Save thumbnail
+        buffer = io.BytesIO()
+        img.save(buffer, format="JPEG", quality=85)
+        thumb_key = f"thumbs/{image_id}_300.jpg"
+        await storage.save(thumb_key, buffer.getvalue(), "image/jpeg")
+
+        # Update database
+        image = await db.get(Image, image_id)
+        image.thumbnail_key = thumb_key
+        await db.commit()
+
+    except Exception as e:
+        logger.warning(f"Thumbnail generation failed for {image_id}: {e}")
+        # Graceful degradation - original image still works
+
+@router.post("/upload")
+async def upload_image(
+    file: UploadFile,
+    background_tasks: BackgroundTasks,
+    service: ImageService = Depends(get_image_service),
+):
+    image, delete_token = await service.upload(file)
+
+    # Queue thumbnail generation - runs after response
+    background_tasks.add_task(
+        generate_thumbnail,
+        image.id,
+        service.storage,
+        service.db,
+    )
+
+    return ImageUploadResponse(
+        id=image.id,
+        thumbnail_ready=False,  # Will be True after background task
+        ...
+    )
 ```
 
-### Configuration
+### What This Enables
+
+```
+User uploads image
+    │
+    ├──► Response in ~500ms (thumbnail_ready=False)
+    │
+    └──► Background: Generate thumbnail (~2s)
+              │
+              └──► DB update: thumbnail_key set, thumbnail_ready=True
+```
+
+### API Changes
 
 ```python
-# celeryconfig.py
-broker_url = "redis://localhost:6379/1"
-result_backend = "redis://localhost:6379/2"
+# GET /api/v1/images/{id}
+{
+    "id": "abc123",
+    "filename": "photo.jpg",
+    "thumbnail_ready": true,  # New field
+    "thumbnail_url": "/api/v1/images/abc123/thumbnail"  # New field
+}
 
-# Safeguards
-worker_max_memory_per_child = 200_000  # 200MB, restart after
-worker_max_tasks_per_child = 100       # Prevent memory leaks
-task_time_limit = 300                  # 5 min hard kill
-task_soft_time_limit = 240             # 4 min soft limit
-worker_prefetch_multiplier = 1         # Don't grab too many tasks
-task_acks_late = True                  # Requeue on crash
-result_expires = 3600                  # Cleanup after 1 hour
+# GET /api/v1/images/{id}/thumbnail
+# Returns 300px thumbnail, or 404 if not ready
 ```
 
-### Docker Compose
+## Consequences
+
+### Positive
+- Zero new dependencies
+- No infrastructure changes
+- Simple implementation (~30 lines)
+- Upload response time unchanged (~500ms)
+- Thumbnails available for UI phase
+
+### Negative
+- No retries (thumbnail may fail silently)
+- Tasks lost on server restart
+- Not distributed (single process)
+
+### Neutral
+- These limitations are acceptable for MVP
+- Can migrate to Celery in Phase 4 if needed
+
+## Phase 4: When to Upgrade to Celery
+
+Upgrade to Celery when ANY of these are true:
+- Need multiple thumbnail sizes (150, 300, 600px)
+- Upload volume exceeds 100/minute sustained
+- Need job persistence across restarts
+- Need distributed workers (multiple servers)
+- Need checksum calculation
+- Need image deduplication
+
+### Phase 4 Celery Scope (Deferred)
 
 ```yaml
+# docker-compose.yml (Phase 4)
 celery-worker:
   build: ./backend
   command: celery -A app.celery_app worker --concurrency=4
   depends_on: [redis, postgres]
 ```
 
-## Capacity & Limits
-
-### Breaking Points
-
-| Resource | Safe | Warning | Breaking |
-|----------|------|---------|----------|
-| Queue depth | <1,000 | 1,000-5,000 | >10,000 (Redis OOM) |
-| Worker memory | <70% | 70-85% | >90% (OOM killer) |
-| Task latency | <5 min | 5-15 min | >30 min |
-
-### Concrete Breaking Scenario
-
-```
-1000 users upload simultaneously
-→ 1000 thumbnail tasks queued
-→ Worker processes 80/minute (4 workers × 20 tasks/min)
-→ Queue depth: 1000 - 80 = 920 after 1 min
-→ Time to clear: 1000/80 = 12.5 minutes
-→ Last user waits 12+ minutes for thumbnails ❌
-```
-
-### MVP Settings (2GB RAM server)
-
-| Setting | Value |
-|---------|-------|
-| `--concurrency` | 4 |
-| `worker_max_memory_per_child` | 200MB |
-| Queue alert threshold | 500 |
-
-**Safe envelope:** ~50-100 concurrent uploads, queue <500 tasks
-
-### Horizontal Scaling
-
-```
-┌──────────────────────────────────────────────────────────────────┐
-│  HORIZONTAL SCALING                                              │
-│                                                                  │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
-│  │  Worker 1   │  │  Worker 2   │  │  Worker 3   │  ...         │
-│  │ concurrency │  │ concurrency │  │ concurrency │              │
-│  │     =4      │  │     =4      │  │     =4      │              │
-│  └─────────────┘  └─────────────┘  └─────────────┘              │
-│         │                │                │                      │
-│         └────────────────┼────────────────┘                      │
-│                          ▼                                       │
-│                    ┌──────────┐                                  │
-│                    │  Redis   │                                  │
-│                    │ (Broker) │                                  │
-│                    └──────────┘                                  │
-└──────────────────────────────────────────────────────────────────┘
-```
-
-```bash
-docker-compose up --scale celery-worker=5
-```
-
-## Consequences
-
-| Type | Impact |
-|------|--------|
-| ✅ Positive | Upload <1s, thumbnails async, workers scale independently |
-| ❌ Negative | Extra process to manage, eventual consistency |
-| ➡️ Neutral | ~150 lines code, 1 new docker service |
-
-## Monitoring
-
-```bash
-# Flower web UI
-celery -A app.celery_app flower --port=5555
-
-# CLI
-celery -A app.celery_app inspect active
-```
+Features deferred to Phase 4:
+- Celery with Redis broker
+- Multiple thumbnail sizes
+- Retry with exponential backoff
+- Checksum calculation (SHA-256)
+- Job monitoring (Flower)
+- Image deduplication
 
 ## References
 
-- [Celery Docs](https://docs.celeryq.dev/)
+- [FastAPI Background Tasks](https://fastapi.tiangolo.com/tutorial/background-tasks/)
+- [Celery Docs](https://docs.celeryq.dev/) (for Phase 4)
 - [ADR-0009: Redis Caching](./0009-redis-caching-for-metadata.md)
