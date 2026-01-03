@@ -12,6 +12,7 @@ from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
 from app.services.cache_service import CacheService
 from app.services.image_service import ImageService
+from app.services.rate_limiter import RateLimiter
 from app.services.storage_service import StorageService
 from app.utils.validation import validate_image_file
 
@@ -47,6 +48,41 @@ def get_client_ip(request: Request) -> str:
     return request.client.host if request.client else "unknown"
 
 
+def get_rate_limiter(request: Request) -> RateLimiter | None:
+    """Dependency to get rate limiter from app state."""
+    return getattr(request.app.state, "rate_limiter", None)
+
+
+async def check_rate_limit(
+    request: Request,
+    rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
+) -> None:
+    """
+    Dependency to check rate limit before processing request.
+
+    Raises HTTPException 429 if rate limit is exceeded.
+    """
+    if not rate_limiter:
+        return  # Rate limiting disabled
+
+    client_ip = get_client_ip(request)
+    result = await rate_limiter.check(client_ip)
+
+    if not result.allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=ErrorDetail(
+                code=ErrorCodes.RATE_LIMIT_EXCEEDED,
+                message=f"Rate limit exceeded. Try again in {result.retry_after} seconds.",
+                details={
+                    "limit": result.limit,
+                    "retry_after": result.retry_after,
+                },
+            ).model_dump(),
+            headers={"Retry-After": str(result.retry_after)},
+        )
+
+
 @router.post(
     "/upload",
     status_code=status.HTTP_201_CREATED,
@@ -55,6 +91,7 @@ def get_client_ip(request: Request) -> str:
         400: {"model": ErrorResponse, "description": "Invalid file"},
         429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
+    dependencies=[Depends(check_rate_limit)],
 )
 async def upload_image(
     request: Request,

@@ -45,7 +45,9 @@ class Settings(BaseSettings):
     debug: bool = True
 
     # Rate Limiting
+    rate_limit_enabled: bool = True
     rate_limit_per_minute: int = 10
+    rate_limit_window_seconds: int = 60  # 1 minute window
 
     # File Upload
     max_file_size_mb: int = 5

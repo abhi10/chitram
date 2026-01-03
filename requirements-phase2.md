@@ -330,17 +330,17 @@ Phase 2 is considered complete when:
 - [x] Storage backend switchable via environment variable
 - [x] MinIO integration tests passing
 
-### Caching (Redis) ⏳
-- [ ] Metadata cached in Redis with 1-hour TTL
-- [ ] Cache invalidated on delete
-- [ ] System works without Redis (graceful degradation)
-- [ ] Cache hit/miss logging implemented
+### Caching (Redis) ✅
+- [x] Metadata cached in Redis with 1-hour TTL
+- [x] Cache invalidated on delete
+- [x] System works without Redis (graceful degradation)
+- [x] Cache hit/miss logging implemented
 
-### Rate Limiting ⏳
-- [ ] 429 returned when limit exceeded
-- [ ] Retry-After header included
-- [ ] Rate limits stored in Redis
-- [ ] Configurable limits per endpoint
+### Rate Limiting ✅
+- [x] 429 returned when limit exceeded
+- [x] Retry-After header included
+- [x] Rate limits stored in Redis
+- [x] Configurable limits (upload endpoint only for now)
 
 ### Authentication ⏳
 - [ ] User registration working
