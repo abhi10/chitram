@@ -17,6 +17,7 @@ from app.config import get_settings
 from app.database import close_db, init_db
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.services.cache_service import CacheService, set_cache
+from app.services.concurrency import UploadSemaphore, set_upload_semaphore
 from app.services.rate_limiter import RateLimiter, set_rate_limiter
 from app.services.storage_service import (
     LocalStorageBackend,
@@ -100,6 +101,15 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Store rate limiter in app state and global
     app.state.rate_limiter = rate_limiter
     set_rate_limiter(rate_limiter)
+
+    # Initialize upload concurrency limiter (ADR-0010)
+    upload_semaphore = UploadSemaphore(
+        limit=settings.upload_concurrency_limit,
+        timeout=settings.upload_concurrency_timeout,
+    )
+    app.state.upload_semaphore = upload_semaphore
+    set_upload_semaphore(upload_semaphore)
+    print(f"✅ Upload concurrency limit: {settings.upload_concurrency_limit}")
 
     print("✅ Image Hosting API ready!")
 

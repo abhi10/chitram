@@ -227,6 +227,26 @@ This document defines the functional and non-functional requirements for Phase 2
 
 ---
 
+### FR-2.8: Concurrency Control (ADR-0010)
+
+#### FR-2.8.1: Upload Concurrency Limits
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.8.1a | The system shall limit concurrent uploads using `asyncio.Semaphore` to protect server resources | Should |
+| FR-2.8.1b | **Where** `UPLOAD_CONCURRENCY_LIMIT` is configured, the system shall allow at most N simultaneous upload processing | Should |
+| FR-2.8.1c | The semaphore shall be acquired **before** reading file content to optimize memory usage | Should |
+| FR-2.8.1d | **If** wait time exceeds `UPLOAD_CONCURRENCY_TIMEOUT`, the system shall return 503 SERVICE_UNAVAILABLE | Should |
+
+#### FR-2.8.2: Concurrency Configuration
+| ID | EARS Requirement | Priority |
+|----|------------------|----------|
+| FR-2.8.2a | The system shall read concurrency settings from environment variables (`UPLOAD_CONCURRENCY_LIMIT`, `UPLOAD_CONCURRENCY_TIMEOUT`) | Should |
+| FR-2.8.2b | Default concurrency limit shall be 10 simultaneous uploads | Should |
+| FR-2.8.2c | Default concurrency timeout shall be 30 seconds | Should |
+| FR-2.8.2d | Health check endpoint shall report current concurrency status | Could |
+
+---
+
 ## Non-Functional Requirements
 
 ### NFR-2.1: Performance
@@ -341,6 +361,12 @@ Phase 2 is considered complete when:
 - [x] Retry-After header included
 - [x] Rate limits stored in Redis
 - [x] Configurable limits (upload endpoint only for now)
+
+### Concurrency Control ⏳
+- [ ] Semaphore limits concurrent uploads (default: 10)
+- [ ] 503 returned when timeout exceeded
+- [ ] Memory optimized (acquire before file.read)
+- [ ] Configurable via environment variables
 
 ### Authentication ⏳
 - [ ] User registration working

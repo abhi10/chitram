@@ -1,13 +1,15 @@
 """Health check endpoints."""
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import get_cache, get_rate_limiter, get_upload_semaphore
 from app.config import get_settings
 from app.database import get_db
 from app.services.cache_service import CacheService
+from app.services.concurrency import UploadSemaphore
 from app.services.rate_limiter import RateLimiter
 
 router = APIRouter(tags=["health"])
@@ -24,16 +26,7 @@ class HealthResponse(BaseModel):
     storage: str
     cache: str
     rate_limiter: str
-
-
-def get_cache(request: Request) -> CacheService | None:
-    """Dependency to get cache service from app state."""
-    return getattr(request.app.state, "cache", None)
-
-
-def get_rate_limiter(request: Request) -> RateLimiter | None:
-    """Dependency to get rate limiter from app state."""
-    return getattr(request.app.state, "rate_limiter", None)
+    upload_concurrency: str
 
 
 @router.get("/health", response_model=HealthResponse)
@@ -41,6 +34,7 @@ async def health_check(
     db: AsyncSession = Depends(get_db),
     cache: CacheService | None = Depends(get_cache),
     rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
+    upload_semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
 ) -> HealthResponse:
     """
     Health check endpoint.
@@ -66,6 +60,14 @@ async def health_check(
     else:
         rate_limiter_status = "disabled"
 
+    # Check upload concurrency status
+    if upload_semaphore:
+        active = upload_semaphore.active_uploads
+        limit = upload_semaphore.limit
+        concurrency_status = f"{active}/{limit} active"
+    else:
+        concurrency_status = "disabled"
+
     # Overall status: healthy if DB connected, degraded if cache is down
     if db_status != "connected":
         overall_status = "unhealthy"
@@ -82,4 +84,5 @@ async def health_check(
         storage=settings.storage_backend,
         cache=cache_status,
         rate_limiter=rate_limiter_status,
+        upload_concurrency=concurrency_status,
     )

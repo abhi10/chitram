@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 10
     rate_limit_window_seconds: int = 60  # 1 minute window
 
+    # Concurrency Control (ADR-0010)
+    upload_concurrency_limit: int = 10  # Max simultaneous uploads
+    upload_concurrency_timeout: float = 30.0  # Seconds to wait for semaphore
+
     # File Upload
     max_file_size_mb: int = 5
     allowed_content_types: str = "image/jpeg,image/png"
