@@ -163,7 +163,7 @@ async def get_by_id(image_id: str) -> Image | None:
 
 ## References
 
-- [requirements-phase2.md](../../requirements-phase2.md) - FR-2.2 Redis Caching requirements
+- [requirements-phase2.md](../.../requirements/phase2.md) - FR-2.2 Redis Caching requirements
 - [phase-2-performance.md](../architecture/phase-2-performance.md) - Architecture overview
 - [Redis Documentation](https://redis.io/docs/)
 - [redis-py Documentation](https://redis-py.readthedocs.io/)

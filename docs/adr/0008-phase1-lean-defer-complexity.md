@@ -183,7 +183,7 @@ Keep the code but disable by default
 
 ## References
 
-- [Phase 1 Requirements](../../requirements.md) - No MinIO/dimensions required
+- [Phase 1 Requirements](../.../requirements/phase1.md) - No MinIO/dimensions required
 - [Removal Summary](../phase1-lean-removals-summary.md) - Detailed instructions
 - [Phase Execution Plan](../phase-execution-plan.md) - Phased approach
 - [ADR-0001](0001-use-fastapi-framework.md) - FastAPI decision

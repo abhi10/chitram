@@ -183,7 +183,7 @@ Environment variables (see `.env.example`):
 
 ## Documentation
 
-- [Requirements](requirements.md) - Phase 1 requirements
+- [Requirements](docs/requirements/phase1.md) - Phase 1 requirements
 - [Design Document](image-hosting-mvp-distributed-systems.md) - Architecture & distributed systems concepts
 - [ADRs](docs/adr/) - Architecture decision records
 - [Development Workflow](docs/development-workflow.md) - How to contribute

@@ -605,7 +605,7 @@ Each phase should be rollback-safe:
 ## References
 
 - **Design Document:** `image-hosting-mvp-distributed-systems.md`
-- **Requirements:** `requirements.md`
+- **Requirements:** `../requirements/phase1.md`
 - **ADR-0008:** Phase 1 Lean decision
 - **Removal Guide:** `phase1-lean-removals-summary.md`
 - **Validation:** `validation-checklist.md`

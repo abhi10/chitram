@@ -85,5 +85,5 @@ Use **Anonymous Access** for Phase 1.
 
 ## References
 
-- [requirements.md](../../requirements.md) - FR-1.8 (anonymous uploads)
+- [../requirements/phase1.md](../.../requirements/phase1.md) - FR-1.8 (anonymous uploads)
 - [ADR-0004](./0004-skip-delete-token-phase1.md) - Related deletion decision

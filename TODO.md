@@ -360,6 +360,32 @@ asyncio.run(main())
 - Easy upload via drag-and-drop
 - User dashboard to manage their images
 
+### 🔬 Spike: UI Layout Design (Pre-Implementation)
+
+> **Status:** 🔴 Not Started
+> **Goal:** Design wireframes and finalize UI/UX decisions before implementation
+
+**Questions to Answer:**
+- [ ] What is the overall visual style? (Minimal, colorful, dark mode?)
+- [ ] What are the exact page layouts and component placements?
+- [ ] Mobile-first or desktop-first responsive approach?
+- [ ] Color scheme and typography choices?
+- [ ] Navigation flow and user journey mapping?
+
+**Deliverables:**
+- [ ] Low-fidelity wireframes for all pages
+- [ ] Component inventory (buttons, cards, forms, modals)
+- [ ] Navigation/routing diagram
+- [ ] Color palette and typography selection
+- [ ] Mobile vs Desktop layout comparison
+- [ ] Decision on TailwindCSS theme customization
+
+**References:**
+- Similar apps for inspiration: Imgur, Unsplash, Postimages
+- TailwindCSS component libraries: DaisyUI, Headless UI, Flowbite
+
+---
+
 ### Public Pages
 - [ ] **Home Page (Gallery):**
   - [ ] Display gallery grid of recent public images
@@ -448,7 +474,7 @@ asyncio.run(main())
 - [ ] UI works on mobile/tablet/desktop
 - [ ] Merge to main, tag `v0.3.0-ui`
 
-**Requirements:** [requirements-phase3.md](./requirements-phase3.md)
+**Requirements:** [docs/requirements/phase3.md](./docs/requirements/phase3.md)
 **ADR:** [ADR-0013: Web UI with HTMX](docs/adr/0013-web-ui-htmx.md)
 
 ---
@@ -733,9 +759,9 @@ git push origin --delete feature/phase-X.X
 - **Retrospectives:** `docs/PHASE2_RETRO.md` - Phase 2 learnings
 - **Code Review:** `docs/code-review-checklist.md`
 - **Requirements:**
-  - `requirements.md` - Phase 1 requirements
-  - `requirements-phase2.md` - Phase 2 requirements (EARS format)
-  - `requirements-phase3.md` - Phase 3 UI requirements (EARS format)
+  - `docs/requirements/phase1.md` - Phase 1 requirements
+  - `docs/requirements/phase2.md` - Phase 2 requirements (EARS format)
+  - `docs/requirements/phase3.md` - Phase 3 UI requirements (EARS format)
 - **ADRs:** `docs/adr/` (13 decisions documented)
 - **CI/CD:** `.github/workflows/ci.yml` - GitHub Actions pipeline
 

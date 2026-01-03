@@ -69,7 +69,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Added
 
 #### Documentation
-- `requirements.md` - Phase 1 functional and non-functional requirements
+- `../requirements/phase1.md` - Phase 1 functional and non-functional requirements
 - `image-hosting-mvp-distributed-systems.md` - Full MVP design document with 4 phases
 - `docs/adr/` - Architecture Decision Records folder
 
@@ -124,7 +124,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 | Document | Current Version | Last Updated |
 |----------|-----------------|--------------|
-| requirements.md | 1.1 | 2025-12-13 |
+| ../requirements/phase1.md | 1.1 | 2025-12-13 |
 | image-hosting-mvp-distributed-systems.md | 1.3 | 2025-12-19 |
 
 ---
@@ -134,7 +134,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 When making changes:
 
 1. **New ADR**: Create `docs/adr/XXXX-short-title.md` using template
-2. **Requirements change**: Update `requirements.md`, bump version
+2. **Requirements change**: Update `../requirements/phase1.md`, bump version
 3. **Architecture change**: Update MVP doc, bump version
 4. **Log here**: Add entry under `[Unreleased]` section
 
