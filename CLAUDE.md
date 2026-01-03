@@ -69,7 +69,7 @@ uv run ruff check --fix .         # Lint
 ## Documentation
 
 ### Planning & Requirements
-- `requirements.md` - Phase 1 functional/non-functional requirements
+- `docs/requirements/phase1.md` - Phase 1 functional/non-functional requirements
 - `image-hosting-mvp-distributed-systems.md` - Full design doc (4 phases)
 - `docs/phase-execution-plan.md` - Tactical execution plan (Phase 1→1.5→2→3→4)
 

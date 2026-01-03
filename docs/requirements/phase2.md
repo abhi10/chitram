@@ -422,7 +422,7 @@ Phase 2 is considered complete when:
 
 ## References
 
-- [Phase 1 Requirements](./requirements.md) - Foundation requirements
+- [Phase 1 Requirements](./phase1.md) - Foundation requirements
 - [EARS Paper](https://www.iaria.org/conferences2012/filesICCGI12/ICCGI_2012_Tutorial_Mavin.pdf) - EARS methodology
 - [TODO.md](./TODO.md) - Implementation tracking
 - [Phase 2 Retro](./docs/PHASE2_RETRO.md) - Lessons learned

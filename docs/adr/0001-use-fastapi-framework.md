@@ -88,4 +88,4 @@ Use **FastAPI** as the web framework.
 
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [FastAPI vs Flask vs Django comparison](https://fastapi.tiangolo.com/alternatives/)
-- [requirements.md](../../requirements.md) - FR-6.1 (OpenAPI requirement)
+- [../requirements/phase1.md](../.../requirements/phase1.md) - FR-6.1 (OpenAPI requirement)

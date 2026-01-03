@@ -273,7 +273,7 @@ Phase 3 is considered complete when:
 
 ## References
 
-- [Phase 2 Requirements](./requirements-phase2.md) - API requirements
+- [Phase 2 Requirements](./phase2.md) - API requirements
 - [HTMX Documentation](https://htmx.org/docs/)
 - [Jinja2 Documentation](https://jinja.palletsprojects.com/)
 - [TailwindCSS Documentation](https://tailwindcss.com/docs)

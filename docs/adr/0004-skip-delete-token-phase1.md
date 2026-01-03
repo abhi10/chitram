@@ -78,5 +78,5 @@ Use **Option 2: Anyone with UUID can delete** for Phase 1.
 
 ## References
 
-- [requirements.md](../../requirements.md) - FR-3.2 (deletion without token)
+- [../requirements/phase1.md](../.../requirements/phase1.md) - FR-3.2 (deletion without token)
 - [ADR-0003](./0003-anonymous-access-phase1.md) - Anonymous access decision

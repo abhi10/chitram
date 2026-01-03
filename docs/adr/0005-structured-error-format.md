@@ -113,5 +113,5 @@ Use **Option 2: Structured Errors with Codes**.
 
 ## References
 
-- [requirements.md](../../requirements.md) - FR-7 (Error Response Format)
+- [../requirements/phase1.md](../.../requirements/phase1.md) - FR-7 (Error Response Format)
 - [RFC 7807 - Problem Details](https://datatracker.ietf.org/doc/html/rfc7807) - Considered alternative

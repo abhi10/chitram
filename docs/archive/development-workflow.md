@@ -14,7 +14,7 @@ A lightweight guide for working through the Image Hosting App development.
 └──────────┘    └──────────┘    └──────────┘    └──────────┘    └──────────┘
      │               │               │               │               │
      ▼               ▼               ▼               ▼               ▼
-requirements.md   Checklist      ADR (if new      Code +        Unit/API/
+../requirements/phase1.md   Checklist      ADR (if new      Code +        Unit/API/
                   or TODO        decision)        Commits       Integration
 ```
 
@@ -25,11 +25,11 @@ requirements.md   Checklist      ADR (if new      Code +        Unit/API/
 **When:** Before starting any feature
 
 **Check:**
-- [ ] Is this feature in `requirements.md`?
+- [ ] Is this feature in `../requirements/phase1.md`?
 - [ ] Are acceptance criteria clear?
 - [ ] Is it in scope for current phase?
 
-**Action:** If requirements unclear, update `requirements.md` first.
+**Action:** If requirements unclear, update `../requirements/phase1.md` first.
 
 ---
 
@@ -174,7 +174,7 @@ A feature is **done** when:
 
 | What | Where |
 |------|-------|
-| Requirements | `requirements.md` |
+| Requirements | `../requirements/phase1.md` |
 | Design doc | `image-hosting-mvp-distributed-systems.md` |
 | ADRs | `docs/adr/` |
 | Changelog | `docs/changelog.md` |
@@ -205,7 +205,7 @@ cp docs/adr/0000-template.md docs/adr/XXXX-name.md
 
 | Event | Update |
 |-------|--------|
-| New requirement | `requirements.md` |
+| New requirement | `../requirements/phase1.md` |
 | Architecture decision | New ADR |
 | Feature complete | `changelog.md` |
 | API change | Swagger (auto) + changelog |
