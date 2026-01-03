@@ -15,10 +15,10 @@ dependencies = [
     "alembic>=1.14.0",
     # Storage
     "aiofiles>=24.1.0",
-    "minio>=7.2.0",           # Phase 2: S3-compatible object storage
+    "minio>=7.2.0", # Phase 2: S3-compatible object storage
     # Caching (Phase 2)
-    "redis>=5.2.0",           # Redis client with async support
-    "hiredis>=3.0.0",         # C parser for performance
+    "redis>=5.2.0", # Redis client with async support
+    "hiredis>=3.0.0", # C parser for performance
     # Validation & Settings
     "pydantic>=2.10.0",
     "pydantic-settings>=2.6.0",
@@ -26,6 +26,9 @@ dependencies = [
     "python-dotenv>=1.0.1",
     "httpx>=0.28.0",
     "pillow>=12.0.0",
+    "python-jose>=3.5.0",
+    "passlib[bcrypt]>=1.7.4",
+    "email-validator>=2.3.0",
 ]
 
 [project.optional-dependencies]

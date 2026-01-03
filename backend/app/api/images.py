@@ -2,13 +2,15 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import get_current_user
 from app.api.dependencies import get_cache, get_rate_limiter, get_upload_semaphore
 from app.config import get_settings
 from app.database import get_db
+from app.models.user import User
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
 from app.services.cache_service import CacheService
@@ -91,12 +93,16 @@ async def upload_image(
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
+    current_user: User | None = Depends(get_current_user),
 ) -> ImageUploadResponse:
     """
     Upload a new image.
 
     Accepts JPEG and PNG files up to 5MB.
     Returns 503 if server is too busy (concurrency limit reached).
+
+    - Anonymous uploads receive a delete_token for later deletion.
+    - Authenticated uploads are linked to the user (no delete token needed).
     """
     # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
     if semaphore:
@@ -132,15 +138,17 @@ async def upload_image(
         # Get client IP
         client_ip = get_client_ip(request)
 
-        # Upload image
-        image = await service.upload(
+        # Upload image with optional user association
+        user_id = current_user.id if current_user else None
+        image, delete_token = await service.upload(
             data=content,
             filename=file.filename or "unnamed",
             content_type=file.content_type or "application/octet-stream",
             upload_ip=client_ip,
+            user_id=user_id,
         )
 
-        # Build response
+        # Build response (delete_token only for anonymous uploads)
         return ImageUploadResponse(
             id=image.id,
             filename=image.filename,
@@ -150,6 +158,7 @@ async def upload_image(
             created_at=image.created_at,
             width=image.width,
             height=image.height,
+            delete_token=delete_token,
         )
     finally:
         # Always release semaphore
@@ -226,20 +235,65 @@ async def download_image(
 @router.delete(
     "/{image_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    responses={404: {"model": ErrorResponse, "description": "Image not found"}},
+    responses={
+        404: {"model": ErrorResponse, "description": "Image not found"},
+        403: {"model": ErrorResponse, "description": "Not authorized to delete"},
+    },
 )
 async def delete_image(
     image_id: str,
+    delete_token: Annotated[
+        str | None, Query(description="Delete token for anonymous uploads")
+    ] = None,
     service: ImageService = Depends(get_image_service),
+    current_user: User | None = Depends(get_current_user),
 ) -> None:
-    """Delete an image."""
-    deleted = await service.delete(image_id)
+    """
+    Delete an image.
 
-    if not deleted:
+    - Authenticated users can delete their own images.
+    - Anonymous uploads require the delete_token returned during upload.
+    """
+    user_id = current_user.id if current_user else None
+    success, reason = await service.delete(image_id, user_id=user_id, delete_token=delete_token)
+
+    if not success:
+        if reason == "not_found":
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=ErrorDetail(
+                    code=ErrorCodes.IMAGE_NOT_FOUND,
+                    message=f"Image with ID '{image_id}' not found",
+                ).model_dump(),
+            )
+        if reason == "not_owner":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ErrorDetail(
+                    code="FORBIDDEN",
+                    message="You do not own this image",
+                ).model_dump(),
+            )
+        if reason == "token_required":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ErrorDetail(
+                    code="DELETE_TOKEN_REQUIRED",
+                    message="Delete token is required for anonymous uploads",
+                ).model_dump(),
+            )
+        if reason == "invalid_token":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail=ErrorDetail(
+                    code="INVALID_DELETE_TOKEN",
+                    message="Invalid delete token",
+                ).model_dump(),
+            )
         raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
+            status_code=status.HTTP_403_FORBIDDEN,
             detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message=f"Image with ID '{image_id}' not found",
+                code="FORBIDDEN",
+                message="Not authorized to delete this image",
             ).model_dump(),
         )

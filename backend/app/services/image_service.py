@@ -11,6 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.image import Image
+from app.services.auth_service import AuthService
 from app.services.storage_service import StorageService
 
 logger = logging.getLogger(__name__)
@@ -84,7 +85,8 @@ class ImageService:
         filename: str,
         content_type: str,
         upload_ip: str,
-    ) -> Image:
+        user_id: str | None = None,
+    ) -> tuple[Image, str | None]:
         """
         Upload a new image.
 
@@ -93,9 +95,11 @@ class ImageService:
             filename: Original filename
             content_type: MIME type
             upload_ip: Client IP address
+            user_id: Authenticated user ID (None for anonymous)
 
         Returns:
-            Created Image model
+            Tuple of (Created Image model, delete_token or None)
+            delete_token is only returned for anonymous uploads
         """
         # Sanitize and generate keys
         safe_filename = self.sanitize_filename(filename)
@@ -104,6 +108,13 @@ class ImageService:
         # Extract image dimensions (non-blocking, runs in thread pool)
         dimensions = await self.get_image_dimensions(data)
         width, height = dimensions if dimensions else (None, None)
+
+        # Generate delete token for anonymous uploads
+        delete_token: str | None = None
+        delete_token_hash: str | None = None
+        if user_id is None:
+            delete_token = AuthService.generate_delete_token()
+            delete_token_hash = AuthService.hash_delete_token(delete_token)
 
         # Save to storage
         await self.storage.save(storage_key, data, content_type)
@@ -117,6 +128,8 @@ class ImageService:
             upload_ip=upload_ip,
             width=width,
             height=height,
+            user_id=user_id,
+            delete_token_hash=delete_token_hash,
         )
 
         self.db.add(image)
@@ -127,7 +140,7 @@ class ImageService:
         if self.cache:
             await self.cache.set_image_metadata(image.id, self._image_to_dict(image))
 
-        return image
+        return image, delete_token
 
     async def get_by_id(self, image_id: str, use_cache: bool = True) -> Image | None:
         """
@@ -191,6 +204,8 @@ class ImageService:
             "upload_ip": image.upload_ip,
             "width": image.width,
             "height": image.height,
+            "user_id": image.user_id,
+            "delete_token_hash": image.delete_token_hash,
             "created_at": image.created_at.isoformat() if image.created_at else None,
         }
 
@@ -211,17 +226,77 @@ class ImageService:
         except FileNotFoundError:
             return None
 
-    async def delete(self, image_id: str) -> bool:
+    def can_delete(
+        self,
+        image: Image,
+        user_id: str | None,
+        delete_token: str | None,
+    ) -> tuple[bool, str]:
         """
-        Delete an image.
+        Check if deletion is authorized.
+
+        Args:
+            image: The image to delete
+            user_id: Authenticated user ID (None if anonymous)
+            delete_token: Delete token for anonymous uploads
 
         Returns:
-            True if deleted, False if not found
+            Tuple of (authorized, reason)
+        """
+        # Authenticated user who owns the image
+        if user_id and image.user_id == user_id:
+            return True, "owner"
+
+        # Anonymous image with valid delete token
+        if (
+            image.user_id is None
+            and image.delete_token_hash
+            and delete_token
+            and AuthService.verify_delete_token(delete_token, image.delete_token_hash)
+        ):
+            return True, "token"
+
+        # Forbidden cases
+        if user_id and image.user_id and image.user_id != user_id:
+            return False, "not_owner"
+
+        if image.user_id is None and not delete_token:
+            return False, "token_required"
+
+        if image.user_id is None and delete_token:
+            return False, "invalid_token"
+
+        return False, "forbidden"
+
+    async def delete(
+        self,
+        image_id: str,
+        user_id: str | None = None,
+        delete_token: str | None = None,
+    ) -> tuple[bool, str]:
+        """
+        Delete an image with authorization check.
+
+        Args:
+            image_id: Image ID to delete
+            user_id: Authenticated user ID (None if anonymous)
+            delete_token: Delete token for anonymous uploads
+
+        Returns:
+            Tuple of (success, reason)
+            - (True, "deleted") if deleted
+            - (False, "not_found") if image doesn't exist
+            - (False, "forbidden") if not authorized
         """
         # Skip cache when fetching for deletion to ensure we have fresh DB state
         image = await self.get_by_id(image_id, use_cache=False)
         if not image:
-            return False
+            return False, "not_found"
+
+        # Check authorization
+        authorized, reason = self.can_delete(image, user_id, delete_token)
+        if not authorized:
+            return False, reason
 
         # Delete from storage (graceful - continue even if storage delete fails)
         try:
@@ -243,4 +318,4 @@ class ImageService:
         await self.db.delete(image)
         await self.db.commit()
 
-        return True
+        return True, "deleted"
