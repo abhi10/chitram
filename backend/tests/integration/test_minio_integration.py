@@ -52,18 +52,20 @@ def test_bucket_name() -> str:
 
 
 @pytest.fixture
-def minio_backend(test_bucket_name) -> MinioStorageBackend:
-    """Create MinIO backend with test bucket."""
+async def minio_backend(test_bucket_name) -> MinioStorageBackend:
+    """Create MinIO backend with test bucket using async factory."""
     endpoint = os.getenv("MINIO_ENDPOINT", "localhost:9000")
     access_key = os.getenv("MINIO_ACCESS_KEY", "minioadmin")
     secret_key = os.getenv("MINIO_SECRET_KEY", "minioadmin")
 
-    backend = MinioStorageBackend(
+    # Use async factory method which creates bucket
+    backend = await MinioStorageBackend.create(
         endpoint=endpoint,
         access_key=access_key,
         secret_key=secret_key,
         bucket=test_bucket_name,
         secure=False,
+        startup_timeout=10.0,
     )
 
     yield backend

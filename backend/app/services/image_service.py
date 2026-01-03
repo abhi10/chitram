@@ -1,7 +1,8 @@
 """Image service - business logic layer."""
 
-import contextlib
+import asyncio
 import io
+import logging
 import uuid
 from typing import TYPE_CHECKING
 
@@ -11,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.image import Image
 from app.services.storage_service import StorageService
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from app.services.cache_service import CacheService
@@ -47,9 +50,25 @@ class ImageService:
         return sanitized or "unnamed"
 
     @staticmethod
-    def get_image_dimensions(data: bytes) -> tuple[int, int] | None:
+    def _extract_dimensions_sync(data: bytes) -> tuple[int, int] | None:
         """
-        Extract image dimensions using Pillow.
+        Synchronous helper to extract image dimensions using Pillow.
+
+        This is CPU-bound work that should be run in a thread pool.
+        """
+        try:
+            with PILImage.open(io.BytesIO(data)) as img:
+                return img.size  # Returns (width, height)
+        except Exception:
+            return None
+
+    @staticmethod
+    async def get_image_dimensions(data: bytes) -> tuple[int, int] | None:
+        """
+        Extract image dimensions using Pillow without blocking event loop.
+
+        Uses asyncio.to_thread() to run CPU-bound Pillow operations
+        in a thread pool, preventing event loop blocking.
 
         Args:
             data: Raw image bytes
@@ -57,13 +76,9 @@ class ImageService:
         Returns:
             Tuple of (width, height) or None if extraction fails
         """
-        try:
-            with PILImage.open(io.BytesIO(data)) as img:
-                return img.size  # Returns (width, height)
-        except Exception:
-            # If Pillow can't read the image, return None
-            # This gracefully handles edge cases without failing the upload
-            return None
+        return await asyncio.to_thread(
+            ImageService._extract_dimensions_sync, data
+        )
 
     async def upload(
         self,
@@ -88,8 +103,8 @@ class ImageService:
         safe_filename = self.sanitize_filename(filename)
         storage_key = self.generate_storage_key(safe_filename)
 
-        # Extract image dimensions (Phase 1.5)
-        dimensions = self.get_image_dimensions(data)
+        # Extract image dimensions (non-blocking, runs in thread pool)
+        dimensions = await self.get_image_dimensions(data)
         width, height = dimensions if dimensions else (None, None)
 
         # Save to storage
@@ -211,8 +226,17 @@ class ImageService:
             return False
 
         # Delete from storage (graceful - continue even if storage delete fails)
-        with contextlib.suppress(Exception):
+        try:
             await self.storage.delete(image.storage_key)
+        except Exception as e:
+            # Log for orphan tracking but continue with DB deletion
+            logger.warning(
+                "Failed to delete storage file %s for image %s: %s. "
+                "File may be orphaned.",
+                image.storage_key,
+                image_id,
+                str(e),
+            )
 
         # Invalidate cache
         if self.cache:

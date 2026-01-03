@@ -2,6 +2,7 @@
 
 import asyncio
 import io
+import logging
 from abc import ABC, abstractmethod
 from pathlib import Path
 
@@ -9,6 +10,8 @@ import aiofiles
 import aiofiles.os
 from minio import Minio
 from minio.error import S3Error
+
+logger = logging.getLogger(__name__)
 
 
 class StorageBackend(ABC):
@@ -126,7 +129,9 @@ class MinioStorageBackend(StorageBackend):
         secure: bool = False,
     ):
         """
-        Initialize MinIO backend.
+        Initialize MinIO backend (synchronous parts only).
+
+        Note: Use create() classmethod for full async initialization with timeout.
 
         Args:
             endpoint: MinIO server endpoint (e.g., "localhost:9000")
@@ -142,18 +147,81 @@ class MinioStorageBackend(StorageBackend):
             secret_key=secret_key,
             secure=secure,
         )
-        # Ensure bucket exists on initialization
-        self._ensure_bucket()
 
-    def _ensure_bucket(self) -> None:
-        """Create bucket if it doesn't exist."""
+    @classmethod
+    async def create(
+        cls,
+        endpoint: str,
+        access_key: str,
+        secret_key: str,
+        bucket: str,
+        secure: bool = False,
+        startup_timeout: float = 10.0,
+    ) -> "MinioStorageBackend":
+        """
+        Async factory method with timeout for bucket initialization.
+
+        Args:
+            endpoint: MinIO server endpoint (e.g., "localhost:9000")
+            access_key: MinIO access key
+            secret_key: MinIO secret key
+            bucket: Bucket name for storing images
+            secure: Use HTTPS if True
+            startup_timeout: Timeout in seconds for bucket check (default 10s)
+
+        Returns:
+            Initialized MinioStorageBackend instance
+
+        Raises:
+            asyncio.TimeoutError: If bucket check exceeds timeout
+            S3Error: If MinIO operation fails
+        """
+        instance = cls(
+            endpoint=endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            bucket=bucket,
+            secure=secure,
+        )
+        await instance._ensure_bucket_async(timeout=startup_timeout)
+        return instance
+
+    def _ensure_bucket_sync(self) -> None:
+        """Synchronous bucket check/creation (runs in thread pool)."""
         try:
             if not self.client.bucket_exists(self.bucket):
                 self.client.make_bucket(self.bucket)
         except S3Error as e:
-            # Log and continue - bucket might already exist or be created by another process
+            # Bucket might already exist or be created by another process
             if e.code != "BucketAlreadyOwnedByYou":
                 raise
+
+    async def _ensure_bucket_async(self, timeout: float = 10.0) -> None:
+        """
+        Async bucket check with timeout.
+
+        Runs the synchronous MinIO bucket check in a thread pool
+        with a configurable timeout to prevent blocking during startup.
+
+        Args:
+            timeout: Maximum seconds to wait for bucket check
+
+        Raises:
+            asyncio.TimeoutError: If operation exceeds timeout
+        """
+        try:
+            await asyncio.wait_for(
+                asyncio.to_thread(self._ensure_bucket_sync),
+                timeout=timeout,
+            )
+        except TimeoutError:
+            logger.error(
+                "MinIO bucket check timed out after %.1f seconds. "
+                "Check MinIO connectivity at %s",
+                timeout,
+                self.client._base_url,
+            )
+            raise
 
     async def save(self, key: str, data: bytes, content_type: str) -> str:
         """Save file to MinIO."""

@@ -155,14 +155,14 @@
   - [x] Health endpoint reports concurrency status
   - [x] Unit tests (12 tests in `tests/unit/test_concurrency.py`)
   - [x] DRY refactor: shared dependencies in `app/api/dependencies.py`
-- [ ] **Technical Debt & Performance Fixes:**
-  - [ ] 🔴 Fix sync Pillow blocking event loop (`asyncio.to_thread()` in `get_image_dimensions`)
-  - [ ] 🔴 Add rate limiting (DoS prevention) - covered in Rate Limiting above
-  - [ ] 🟡 Configure DB connection pool (`pool_size`, `max_overflow`, `pool_recycle`)
-  - [ ] 🟡 Make MinIO bucket check async with timeout (startup resilience)
-  - [ ] 🟡 Add logging for silent storage deletion failures (orphan tracking)
+- [x] **Technical Debt & Performance Fixes:** ✅ Complete
+  - [x] ~~🔴 Fix sync Pillow blocking event loop~~ - ✅ Complete (`asyncio.to_thread()` in `get_image_dimensions`)
+  - [x] ~~🔴 Add rate limiting (DoS prevention)~~ - ✅ Complete (see Rate Limiting above)
+  - [x] ~~🟡 Configure DB connection pool~~ - ✅ Complete (`pool_size=5`, `max_overflow=10`, `pool_recycle=3600`)
+  - [x] ~~🟡 Make MinIO bucket check async with timeout~~ - ✅ Complete (`MinioStorageBackend.create()` factory method)
+  - [x] ~~🟡 Add logging for storage deletion failures~~ - ✅ Complete (orphan tracking with warning logs)
   - [ ] 🟡 Consider streaming uploads (defer to Phase 3 if complex)
-- [x] **Testing & Validation:** ✅ 99 tests passing
+- [x] **Testing & Validation:** ✅ 114 tests passing
   - [x] All Phase 1 functionality preserved
   - [x] Storage switching works
   - [x] Cache hit/miss working (X-Cache header)
@@ -663,8 +663,8 @@ git push origin --delete feature/phase-X.X
 - ✅ Fail-open design for rate limiter
 - ✅ Concurrency control (10 concurrent uploads, 503 on timeout) - ADR-0010
 - ✅ Shared API dependencies module (`app/api/dependencies.py`)
-- ✅ Unit tests (12 concurrency + 22 rate limiter + 19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
-- ✅ All 99 tests passing
+- ✅ Unit tests (12 concurrency + 22 rate limiter + 19 cache + 11 MinIO + 17 performance) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
+- ✅ All 114 tests passing
 - ✅ GitHub Actions CI workflow (lint, test, dependency-check)
 - ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
 - ✅ Codespaces Runbook + Phase 2 Retrospective docs
@@ -717,6 +717,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2026-01-02:** Phase 2 Redis caching complete (ADR-0009, 43+ tests passing)
 - [x] **2026-01-02:** Phase 2 Rate limiting complete (83 tests passing)
 - [x] **2026-01-02:** Phase 2 Concurrency control complete (ADR-0010, 99 tests passing)
+- [x] **2026-01-02:** Phase 2 Technical debt fixes complete (114 tests passing)
 - [ ] **Next:** Phase 2 Auth + Background Jobs
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability
