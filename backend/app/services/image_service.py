@@ -76,9 +76,7 @@ class ImageService:
         Returns:
             Tuple of (width, height) or None if extraction fails
         """
-        return await asyncio.to_thread(
-            ImageService._extract_dimensions_sync, data
-        )
+        return await asyncio.to_thread(ImageService._extract_dimensions_sync, data)
 
     async def upload(
         self,
@@ -231,8 +229,7 @@ class ImageService:
         except Exception as e:
             # Log for orphan tracking but continue with DB deletion
             logger.warning(
-                "Failed to delete storage file %s for image %s: %s. "
-                "File may be orphaned.",
+                "Failed to delete storage file %s for image %s: %s. File may be orphaned.",
                 image.storage_key,
                 image_id,
                 str(e),

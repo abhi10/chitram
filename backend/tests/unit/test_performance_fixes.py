@@ -287,9 +287,7 @@ class TestStorageDeletionLogging:
         return MagicMock()
 
     @pytest.mark.asyncio
-    async def test_delete_logs_storage_failure(
-        self, mock_db, mock_storage, mock_cache, caplog
-    ):
+    async def test_delete_logs_storage_failure(self, mock_db, mock_storage, mock_cache, caplog):
         """Delete operation logs warning when storage delete fails."""
         from unittest.mock import AsyncMock
 
@@ -333,9 +331,7 @@ class TestStorageDeletionLogging:
         assert "orphaned" in caplog.text.lower()
 
     @pytest.mark.asyncio
-    async def test_delete_continues_after_storage_failure(
-        self, mock_db, mock_storage, mock_cache
-    ):
+    async def test_delete_continues_after_storage_failure(self, mock_db, mock_storage, mock_cache):
         """Delete completes DB operation even when storage fails."""
         from unittest.mock import AsyncMock
 
