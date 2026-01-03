@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.database import Base, get_db
 from app.main import app
 from app.services.cache_service import set_cache
+from app.services.rate_limiter import set_rate_limiter
 from app.services.storage_service import LocalStorageBackend, StorageService
 
 # Test database URL (in-memory SQLite for tests)
@@ -99,6 +100,10 @@ async def client(
     app.state.cache = None
     set_cache(None)
 
+    # Disable rate limiting for API tests (rate limiter tested separately)
+    app.state.rate_limiter = None
+    set_rate_limiter(None)
+
     transport = ASGITransport(app=app)
     async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
@@ -107,3 +112,5 @@ async def client(
     app.dependency_overrides.clear()
     app.state.cache = None
     set_cache(None)
+    app.state.rate_limiter = None
+    set_rate_limiter(None)

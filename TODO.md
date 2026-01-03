@@ -139,10 +139,14 @@
   - [x] Health endpoint reports cache status
   - [x] Unit tests (19 tests with mocking)
   - [x] Integration tests (11 tests, auto-skip without Redis)
-- [ ] **Rate Limiting:**
-  - [ ] Redis-backed rate limiter
-  - [ ] 10 requests/IP/minute
-  - [ ] Return 429 with Retry-After header
+- [x] **Rate Limiting:** ✅ Complete
+  - [x] Redis-backed rate limiter (`rate_limiter.py`)
+  - [x] 10 requests/IP/minute (configurable via `RATE_LIMIT_PER_MINUTE`)
+  - [x] Return 429 with Retry-After header
+  - [x] Fail-open design (allows requests if Redis unavailable)
+  - [x] Health endpoint reports rate limiter status
+  - [x] Unit tests (22 tests with mocking)
+  - [x] Rate limiting disabled in test fixtures
 - [ ] **Concurrency Control:** (from Graphiti patterns)
   - [ ] Add `asyncio.Semaphore` for concurrent upload limits
   - [ ] Prevent file collision on simultaneous uploads
@@ -154,11 +158,23 @@
   - [ ] 🟡 Make MinIO bucket check async with timeout (startup resilience)
   - [ ] 🟡 Add logging for silent storage deletion failures (orphan tracking)
   - [ ] 🟡 Consider streaming uploads (defer to Phase 3 if complex)
-- [ ] **Testing & Validation:**
+- [x] **Testing & Validation:** ✅ 83 tests passing
   - [x] All Phase 1 functionality preserved
   - [x] Storage switching works
   - [x] Cache hit/miss working (X-Cache header)
-  - [ ] Rate limits enforced
+  - [x] Rate limits enforced (429 + Retry-After)
+
+### Rate Limiting Testing Checklist
+| # | Test | Expected Result | Status |
+|---|------|-----------------|--------|
+| 1 | Start app with Redis | Log: "✅ Rate limiter enabled (Redis-backed)" | ⬜ |
+| 2 | Upload 10 images quickly | All succeed (200/201) | ⬜ |
+| 3 | Upload 11th image | 429 Too Many Requests | ⬜ |
+| 4 | Check response headers | `Retry-After: <seconds>` present | ⬜ |
+| 5 | Wait for window reset | Next upload succeeds | ⬜ |
+| 6 | Stop Redis, upload image | Request allowed (fail-open) | ⬜ |
+| 7 | Health check | `"rate_limiter": "enabled"` | ⬜ |
+| 8 | Set `RATE_LIMIT_ENABLED=false` | Unlimited requests allowed | ⬜ |
 
 ### Week 2: Auth & Background Jobs
 - [ ] **User Authentication:**
@@ -584,19 +600,21 @@ git push origin --delete feature/phase-X.X
 1. ✅ MinIO Backend - Complete & Validated in Codespaces!
 2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
 3. ✅ Redis caching layer - Complete with Cache-Aside pattern!
-4. ⏳ Rate limiting implementation (Next)
-5. ⏳ User authentication (JWT)
+4. ✅ Rate limiting - Complete with fail-open design!
+5. ⏳ User authentication (JWT) - Next
 6. ⏳ Background jobs (Celery)
 
-**Completed (Phase 2 - MinIO + CI + Redis):**
+**Completed (Phase 2 - MinIO + CI + Redis + Rate Limiting):**
 - ✅ MinioStorageBackend implementation (Strategy Pattern)
 - ✅ Docker Compose with MinIO + Redis services
 - ✅ Configuration-based backend selection
 - ✅ Redis caching with Cache-Aside pattern (ADR-0009)
 - ✅ X-Cache header (HIT/MISS/DISABLED)
 - ✅ Graceful degradation when Redis unavailable
-- ✅ Unit tests (19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
-- ✅ All 43+ tests passing
+- ✅ Rate limiting (10 req/IP/min, 429 + Retry-After)
+- ✅ Fail-open design for rate limiter
+- ✅ Unit tests (22 rate limiter + 19 cache + 11 MinIO) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
+- ✅ All 83 tests passing
 - ✅ GitHub Actions CI workflow (lint, test, dependency-check)
 - ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
 - ✅ Codespaces Runbook + Phase 2 Retrospective docs
@@ -647,7 +665,7 @@ Week 8:     Phase 4 ⏸️ (Not started)
 - [x] **2026-01-01:** GitHub Actions CI pipeline added
 - [x] **2026-01-01:** Phase 2 Retrospective documented (6 issues, 4 blockers resolved)
 - [x] **2026-01-02:** Phase 2 Redis caching complete (ADR-0009, 43+ tests passing)
-- [ ] **In Progress:** Phase 2 Rate limiting
+- [x] **2026-01-02:** Phase 2 Rate limiting complete (83 tests passing)
 - [ ] **Next:** Phase 2 Auth + Background Jobs
 - [ ] **Next:** Phase 3 horizontal scaling
 - [ ] **Next:** Phase 4 observability
