@@ -206,6 +206,7 @@ class ImageService:
             "height": image.height,
             "user_id": image.user_id,
             "delete_token_hash": image.delete_token_hash,
+            "thumbnail_key": image.thumbnail_key,
             "created_at": image.created_at.isoformat() if image.created_at else None,
         }
 

@@ -33,6 +33,9 @@ class ImageMetadata(BaseModel):
     # Phase 1.5: Image dimensions (optional for backward compatibility)
     width: int | None = None
     height: int | None = None
+    # Phase 2B: Thumbnail status
+    thumbnail_ready: bool = False
+    thumbnail_url: str | None = None
 
 
 class ImageResponse(ImageMetadata):
@@ -55,3 +58,6 @@ class ImageUploadResponse(BaseModel):
     height: int | None = None
     # Phase 2A: Delete token for anonymous uploads (only returned once)
     delete_token: str | None = None
+    # Phase 2B: Thumbnail status (always False on upload, becomes True after background task)
+    thumbnail_ready: bool = False
+    thumbnail_url: str | None = None

@@ -15,7 +15,7 @@ from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.images import router as images_router
 from app.config import get_settings
-from app.database import close_db, init_db
+from app.database import async_session_maker, close_db, init_db
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.services.cache_service import CacheService, set_cache
 from app.services.concurrency import UploadSemaphore, set_upload_semaphore
@@ -25,6 +25,7 @@ from app.services.storage_service import (
     MinioStorageBackend,
     StorageService,
 )
+from app.services.thumbnail_service import ThumbnailService
 
 settings = get_settings()
 
@@ -112,6 +113,14 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.upload_semaphore = upload_semaphore
     set_upload_semaphore(upload_semaphore)
     print(f"✅ Upload concurrency limit: {settings.upload_concurrency_limit}")
+
+    # Initialize thumbnail service (Phase 2B)
+    thumbnail_service = ThumbnailService(
+        storage=app.state.storage,
+        session_factory=async_session_maker,
+    )
+    app.state.thumbnail_service = thumbnail_service
+    print("✅ Thumbnail service initialized")
 
     print("✅ Image Hosting API ready!")
 

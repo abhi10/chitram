@@ -2,7 +2,17 @@
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Depends,
+    File,
+    HTTPException,
+    Query,
+    Request,
+    UploadFile,
+    status,
+)
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -18,6 +28,7 @@ from app.services.concurrency import UploadSemaphore
 from app.services.image_service import ImageService
 from app.services.rate_limiter import RateLimiter
 from app.services.storage_service import StorageService
+from app.services.thumbnail_service import ThumbnailService
 from app.utils.validation import validate_image_file
 
 router = APIRouter(prefix="/images", tags=["images"])
@@ -27,6 +38,11 @@ settings = get_settings()
 def get_storage(request: Request) -> StorageService:
     """Dependency to get storage service from app state."""
     return request.app.state.storage
+
+
+def get_thumbnail_service(request: Request) -> ThumbnailService:
+    """Dependency to get thumbnail service from app state."""
+    return request.app.state.thumbnail_service
 
 
 def get_image_service(
@@ -90,8 +106,10 @@ async def check_rate_limit(
 )
 async def upload_image(
     request: Request,
+    background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
+    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
     current_user: User | None = Depends(get_current_user),
 ) -> ImageUploadResponse:
@@ -103,6 +121,7 @@ async def upload_image(
 
     - Anonymous uploads receive a delete_token for later deletion.
     - Authenticated uploads are linked to the user (no delete token needed).
+    - Thumbnail generation is queued as a background task (Phase 2B).
     """
     # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
     if semaphore:
@@ -148,7 +167,14 @@ async def upload_image(
             user_id=user_id,
         )
 
+        # Queue thumbnail generation as background task (Phase 2B)
+        background_tasks.add_task(
+            thumbnail_service.generate_and_store_thumbnail,
+            image.id,
+        )
+
         # Build response (delete_token only for anonymous uploads)
+        # thumbnail_ready=False since background task hasn't run yet
         return ImageUploadResponse(
             id=image.id,
             filename=image.filename,
@@ -159,6 +185,8 @@ async def upload_image(
             width=image.width,
             height=image.height,
             delete_token=delete_token,
+            thumbnail_ready=False,
+            thumbnail_url=None,
         )
     finally:
         # Always release semaphore
@@ -180,7 +208,8 @@ async def get_image_metadata(
     """
     Get image metadata by ID.
 
-    Returns X-Cache header: HIT (from cache), MISS (from DB, cached), or DISABLED
+    Returns X-Cache header: HIT (from cache), MISS (from DB, cached), or DISABLED.
+    Includes thumbnail_ready and thumbnail_url if thumbnail is available.
     """
     image, cache_status = await service.get_by_id_with_cache_status(image_id)
 
@@ -193,7 +222,21 @@ async def get_image_metadata(
             ).model_dump(),
         )
 
-    metadata = ImageMetadata.model_validate(image)
+    # Build metadata with thumbnail info
+    thumbnail_ready = image.thumbnail_key is not None
+    thumbnail_url = f"/api/v1/images/{image_id}/thumbnail" if thumbnail_ready else None
+
+    metadata = ImageMetadata(
+        id=image.id,
+        filename=image.filename,
+        content_type=image.content_type,
+        file_size=image.file_size,
+        created_at=image.created_at,
+        width=image.width,
+        height=image.height,
+        thumbnail_ready=thumbnail_ready,
+        thumbnail_url=thumbnail_url,
+    )
     return Response(
         content=metadata.model_dump_json(),
         media_type="application/json",
@@ -229,6 +272,68 @@ async def download_image(
         content=data,
         media_type=content_type,
         headers={"Content-Disposition": f"inline; filename={image_id}"},
+    )
+
+
+@router.get(
+    "/{image_id}/thumbnail",
+    responses={
+        200: {"content": {"image/jpeg": {}}},
+        404: {"model": ErrorResponse, "description": "Image or thumbnail not found"},
+    },
+)
+async def get_thumbnail(
+    image_id: str,
+    service: ImageService = Depends(get_image_service),
+    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
+) -> Response:
+    """
+    Get thumbnail for an image.
+
+    Returns the 300px thumbnail if available.
+    Returns 404 with THUMBNAIL_NOT_READY if thumbnail hasn't been generated yet.
+    Returns 404 with IMAGE_NOT_FOUND if image doesn't exist.
+    """
+    # First check if image exists using the injected service
+    image = await service.get_by_id(image_id)
+
+    if image is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ErrorDetail(
+                code=ErrorCodes.IMAGE_NOT_FOUND,
+                message=f"Image with ID '{image_id}' not found",
+            ).model_dump(),
+        )
+
+    # Check if thumbnail is ready
+    if not image.thumbnail_key:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ErrorDetail(
+                code=ErrorCodes.THUMBNAIL_NOT_READY,
+                message="Thumbnail is not yet available. Try again later.",
+            ).model_dump(),
+        )
+
+    # Get thumbnail from storage
+    result = await thumbnail_service.get_thumbnail(image_id)
+
+    if result is None:
+        # Thumbnail key exists but file not found in storage - treat as not ready
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=ErrorDetail(
+                code=ErrorCodes.THUMBNAIL_NOT_READY,
+                message="Thumbnail is not yet available. Try again later.",
+            ).model_dump(),
+        )
+
+    data, content_type = result
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Content-Disposition": f"inline; filename={image_id}_thumbnail.jpg"},
     )
 
 
