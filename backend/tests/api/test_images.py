@@ -120,16 +120,19 @@ class TestDeleteImage:
     """Tests for DELETE /api/v1/images/{image_id}."""
 
     async def test_delete_existing_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
-        """Deleting existing image returns 204."""
-        # Upload first
+        """Deleting existing image with delete token returns 204."""
+        # Upload first (anonymous gets delete_token)
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
         )
         image_id = upload_response.json()["id"]
+        delete_token = upload_response.json()["delete_token"]
 
-        # Delete
-        response = await client.delete(f"/api/v1/images/{image_id}")
+        # Delete with token
+        response = await client.delete(
+            f"/api/v1/images/{image_id}", params={"delete_token": delete_token}
+        )
 
         assert response.status_code == 204
 
@@ -139,7 +142,9 @@ class TestDeleteImage:
 
     async def test_delete_nonexistent_image(self, client: AsyncClient):
         """Deleting nonexistent image returns 404."""
-        response = await client.delete("/api/v1/images/nonexistent-id")
+        response = await client.delete(
+            "/api/v1/images/nonexistent-id", params={"delete_token": "any_token"}
+        )
 
         assert response.status_code == 404
 

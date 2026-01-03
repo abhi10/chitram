@@ -4,16 +4,16 @@ import hashlib
 import secrets
 from datetime import UTC, datetime, timedelta
 
+import bcrypt as bcrypt_lib
 from jose import JWTError, jwt
-from passlib.context import CryptContext
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models.user import User
 
-# bcrypt with work factor 12 (takes ~200-400ms to hash)
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto", bcrypt__rounds=12)
+# bcrypt work factor 12 (takes ~200-400ms to hash)
+BCRYPT_WORK_FACTOR = 12
 
 
 class AuthService:
@@ -27,11 +27,18 @@ class AuthService:
 
     def hash_password(self, password: str) -> str:
         """Hash password using bcrypt with work factor 12."""
-        return pwd_context.hash(password)
+        salt = bcrypt_lib.gensalt(rounds=BCRYPT_WORK_FACTOR)
+        hashed = bcrypt_lib.hashpw(password.encode("utf-8"), salt)
+        return hashed.decode("utf-8")
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
         """Verify password against hash using timing-safe comparison."""
-        return pwd_context.verify(plain_password, hashed_password)
+        try:
+            return bcrypt_lib.checkpw(
+                plain_password.encode("utf-8"), hashed_password.encode("utf-8")
+            )
+        except Exception:
+            return False
 
     # --- JWT Token Management ---
 

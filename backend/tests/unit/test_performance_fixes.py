@@ -294,6 +294,7 @@ class TestStorageDeletionLogging:
         from app.models.image import Image
 
         # Setup mock image
+        # Use user_id for owned image (no delete token needed)
         test_image = Image(
             id="test-uuid",
             filename="test.jpg",
@@ -301,6 +302,7 @@ class TestStorageDeletionLogging:
             content_type="image/jpeg",
             file_size=1024,
             upload_ip="127.0.0.1",
+            user_id="test-user",  # Owned image
         )
 
         # Mock get_by_id to return test image
@@ -320,10 +322,12 @@ class TestStorageDeletionLogging:
         service = ImageService(db=mock_db, storage=mock_storage, cache=mock_cache)
 
         with caplog.at_level(logging.WARNING):
-            result = await service.delete("test-uuid")
+            # Pass user_id to authorize deletion
+            success, reason = await service.delete("test-uuid", user_id="test-user")
 
         # Delete should still succeed (graceful degradation)
-        assert result is True
+        assert success is True
+        assert reason == "deleted"
 
         # Warning should be logged
         assert "Failed to delete storage file" in caplog.text
@@ -344,6 +348,7 @@ class TestStorageDeletionLogging:
             content_type="image/jpeg",
             file_size=1024,
             upload_ip="127.0.0.1",
+            user_id="test-user",  # Owned image
         )
 
         mock_db.execute = AsyncMock()
@@ -358,9 +363,10 @@ class TestStorageDeletionLogging:
 
         service = ImageService(db=mock_db, storage=mock_storage, cache=mock_cache)
 
-        result = await service.delete("test-uuid")
+        success, reason = await service.delete("test-uuid", user_id="test-user")
 
-        assert result is True
+        assert success is True
+        assert reason == "deleted"
         # DB operations should still be called
         mock_db.delete.assert_called_once()
         mock_db.commit.assert_called_once()
@@ -382,6 +388,7 @@ class TestStorageDeletionLogging:
             content_type="image/jpeg",
             file_size=1024,
             upload_ip="127.0.0.1",
+            user_id="test-user",  # Owned image
         )
 
         mock_db.execute = AsyncMock()
@@ -397,7 +404,8 @@ class TestStorageDeletionLogging:
         service = ImageService(db=mock_db, storage=mock_storage, cache=mock_cache)
 
         with caplog.at_level(logging.WARNING):
-            result = await service.delete("test-uuid")
+            success, reason = await service.delete("test-uuid", user_id="test-user")
 
-        assert result is True
+        assert success is True
+        assert reason == "deleted"
         assert "Failed to delete storage file" not in caplog.text
