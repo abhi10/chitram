@@ -225,76 +225,78 @@ asyncio.run(main())
 ### Phase 2A: User Authentication (ADR-0011)
 
 **Goal:** Enable user ownership of images and secure deletion.
+**Status:** ✅ Complete (151 tests passing)
+**Branch:** `feature2/phase2A-auth`
 
 **Why This Matters for Users:**
 - Own their images (track uploads, manage gallery)
 - Secure deletion (only owner can delete)
 - Foundation for per-user features (quotas, sharing)
 
-- [ ] **Database & Models:**
-  - [ ] Create `users` table (id, email, password_hash, is_active, is_admin, created_at)
-  - [ ] Add `user_id` FK to `images` table (nullable for anonymous)
-  - [ ] Add `delete_token_hash` to `images` table
-  - [ ] Create Alembic migration
-  - [ ] Update SQLAlchemy models
-- [ ] **Authentication Service:**
-  - [ ] Add dependencies: `python-jose`, `passlib[bcrypt]`
-  - [ ] Create `app/services/auth_service.py`
-  - [ ] Password hashing with bcrypt (work factor 12)
-  - [ ] JWT token generation (HS256, 24h expiry)
-  - [ ] JWT token validation
-- [ ] **Auth Endpoints:**
-  - [ ] `POST /api/v1/auth/register` - Create account
-  - [ ] `POST /api/v1/auth/login` - Get JWT token
-  - [ ] `GET /api/v1/users/me` - Current user profile
-  - [ ] `GET /api/v1/users/me/images` - List user's images
-- [ ] **Delete Token System:**
-  - [ ] Generate secure token on anonymous upload (32 bytes, URL-safe)
-  - [ ] Return `delete_token` in upload response (anonymous only)
-  - [ ] Store hash in database (not plaintext)
-  - [ ] Require token for anonymous image deletion
-  - [ ] Skip token check if authenticated user owns image
-- [ ] **Protected Routes:**
-  - [ ] `Depends(get_current_user)` for protected endpoints
-  - [ ] `DELETE /api/v1/images/{id}` - Require ownership OR delete token
-  - [ ] Return 401 for missing/invalid JWT
-  - [ ] Return 403 for wrong owner/token
-- [ ] **Configuration:**
-  - [ ] `JWT_SECRET_KEY` environment variable (required)
-  - [ ] `JWT_ALGORITHM` (default: HS256)
-  - [ ] `JWT_EXPIRE_MINUTES` (default: 1440 = 24h)
-- [ ] **Testing:**
-  - [ ] Unit tests for auth service
-  - [ ] API tests for auth endpoints
-  - [ ] Integration tests for protected routes
-- [ ] **Security Testing:** (See ADR-0011)
-  - [ ] Password Security:
-    - [ ] Verify bcrypt hash format (`$2b$` prefix)
-    - [ ] Verify work factor ≥ 12 (timing: 200-400ms)
-    - [ ] No plaintext passwords in logs/responses
-  - [ ] JWT Security:
-    - [ ] Required claims present (sub, exp, iat)
-    - [ ] Expired tokens rejected (401)
-    - [ ] Invalid signatures rejected (401)
-    - [ ] Algorithm confusion prevented (only HS256)
-  - [ ] API Security:
-    - [ ] No user enumeration (same error for wrong email/password)
-    - [ ] Rate limiting on `/auth/*` endpoints
-    - [ ] Timing-safe comparisons
-  - [ ] Delete Token Security:
-    - [ ] 32-byte cryptographically random tokens
-    - [ ] Hash stored in DB (not plaintext)
-    - [ ] Timing-safe token comparison
-  - [ ] OWASP Alignment:
-    - [ ] A01: Access control tested
-    - [ ] A02: Password hashing verified
-    - [ ] A07: No credentials in logs
+- [x] **Database & Models:**
+  - [x] Create `users` table (id, email, password_hash, is_active, created_at)
+  - [x] Add `user_id` FK to `images` table (nullable for anonymous)
+  - [x] Add `delete_token_hash` to `images` table
+  - [x] Create Alembic migration (`2f6a8fb30700_add_users_table_and_image_ownership.py`)
+  - [x] Update SQLAlchemy models (`app/models/user.py`, `app/models/image.py`)
+- [x] **Authentication Service:**
+  - [x] Add dependencies: `python-jose`, `bcrypt`, `email-validator`
+  - [x] Create `app/services/auth_service.py`
+  - [x] Password hashing with bcrypt (work factor 12)
+  - [x] JWT token generation (HS256, 24h expiry)
+  - [x] JWT token validation
+- [x] **Auth Endpoints:**
+  - [x] `POST /api/v1/auth/register` - Create account
+  - [x] `POST /api/v1/auth/login` - Get JWT token
+  - [x] `POST /api/v1/auth/token` - OAuth2 token endpoint (for Swagger UI)
+  - [x] `GET /api/v1/auth/me` - Current user profile
+  - [ ] `GET /api/v1/users/me/images` - List user's images (deferred to Phase 2C)
+- [x] **Delete Token System:**
+  - [x] Generate secure token on anonymous upload (32 bytes, URL-safe)
+  - [x] Return `delete_token` in upload response (anonymous only)
+  - [x] Store SHA-256 hash in database (not plaintext)
+  - [x] Require token for anonymous image deletion
+  - [x] Skip token check if authenticated user owns image
+- [x] **Protected Routes:**
+  - [x] `Depends(get_current_user)` for protected endpoints
+  - [x] `DELETE /api/v1/images/{id}` - Require ownership OR delete token
+  - [x] Return 401 for missing/invalid JWT
+  - [x] Return 403 for wrong owner/token
+- [x] **Configuration:**
+  - [x] `JWT_SECRET_KEY` environment variable (default for dev, required in prod)
+  - [x] `JWT_ALGORITHM` (default: HS256)
+  - [x] `JWT_EXPIRE_MINUTES` (default: 1440 = 24h)
+- [x] **Testing:** (38 auth tests)
+  - [x] Unit tests for auth service (18 tests)
+  - [x] API tests for auth endpoints (12 tests)
+  - [x] API tests for protected image routes (8 tests)
+- [x] **Security Testing:** (See ADR-0011)
+  - [x] Password Security:
+    - [x] Verify bcrypt hash format (`$2b$` prefix) - tested
+    - [x] Verify work factor ≥ 12 (timing: 200-400ms) - tested
+    - [x] No plaintext passwords in logs/responses - verified
+  - [x] JWT Security:
+    - [x] Required claims present (sub, exp, iat) - tested
+    - [x] Expired tokens rejected (401) - tested
+    - [x] Invalid signatures rejected (401) - tested
+    - [x] Algorithm confusion prevented (only HS256) - enforced
+  - [x] API Security:
+    - [x] No user enumeration (same error for wrong email/password) - tested
+    - [ ] Rate limiting on `/auth/*` endpoints - uses existing rate limiter
+    - [x] Timing-safe comparisons - using secrets.compare_digest
+  - [x] Delete Token Security:
+    - [x] 32-byte cryptographically random tokens - using secrets.token_urlsafe(32)
+    - [x] Hash stored in DB (not plaintext) - SHA-256 hash
+    - [x] Timing-safe token comparison - using secrets.compare_digest
+  - [x] OWASP Alignment:
+    - [x] A01: Access control tested (ownership checks)
+    - [x] A02: Password hashing verified (bcrypt)
+    - [x] A07: No credentials in logs (verified)
 - [ ] **Validation & Merge:**
-  - [ ] All auth tests passing
-  - [ ] Anonymous uploads still work (backward compatible)
+  - [x] All auth tests passing (151 tests total)
+  - [x] Anonymous uploads still work (backward compatible)
   - [ ] Merge to main, tag `v0.2.0-auth`
 
-**Branch:** `feature2/phase2-auth`
 **ADR:** [ADR-0011: User Authentication with JWT](docs/adr/0011-user-authentication-jwt.md)
 
 ---
@@ -744,6 +746,8 @@ git push origin --delete feature/phase-X.X
   - One-time code reviews
 
 ### Key ADRs
+- **ADR-0012:** Background Jobs with Celery (proposed)
+- **ADR-0011:** User Authentication with JWT (implemented)
 - **ADR-0010:** Concurrency control for uploads (asyncio.Semaphore)
 - **ADR-0009:** Redis caching for metadata (Cache-Aside pattern)
 - **ADR-0008:** Phase 1 Lean approach (defer complexity)
