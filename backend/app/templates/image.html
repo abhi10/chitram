@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ image.filename }} - Chitram</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        terracotta: {
+                            400: '#D4A574',
+                            500: '#C4956A',
+                            600: '#B4855A',
+                        },
+                        cream: {
+                            100: '#FAF8F5',
+                            200: '#F5F2ED',
+                        }
+                    },
+                    fontFamily: {
+                        display: ['Playfair Display', 'serif'],
+                        sans: ['Source Sans 3', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <style>
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+        }
+        .font-display {
+            font-family: 'Playfair Display', serif;
+        }
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-900 min-h-screen">
+    <!-- Close Button -->
+    <a href="/" class="fixed top-4 right-4 z-50 text-white/70 hover:text-white transition-colors p-2">
+        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+        </svg>
+    </a>
+
+    <!-- Main Content -->
+    <div class="min-h-screen flex items-center justify-center p-4 md:p-8">
+        <div class="max-w-7xl w-full grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <!-- Image -->
+            <div class="lg:col-span-2 flex items-center justify-center">
+                <img
+                    src="/api/v1/images/{{ image.id }}/file"
+                    alt="{{ image.filename }}"
+                    class="max-w-full max-h-[80vh] rounded-2xl shadow-2xl object-contain"
+                >
+            </div>
+
+            <!-- Metadata Panel -->
+            <div class="glass rounded-2xl p-6 text-white h-fit">
+                <!-- Title -->
+                <h1 class="font-display text-2xl font-semibold mb-4 break-words">
+                    {{ image.filename }}
+                </h1>
+
+                <!-- Divider -->
+                <hr class="border-white/20 my-4">
+
+                <!-- Metadata -->
+                <div class="space-y-3 text-sm">
+                    <div class="flex justify-between">
+                        <span class="text-white/60">Size</span>
+                        <span>{{ (image.file_size / 1024) | round(1) }} KB</span>
+                    </div>
+                    {% if image.width and image.height %}
+                    <div class="flex justify-between">
+                        <span class="text-white/60">Dimensions</span>
+                        <span>{{ image.width }} × {{ image.height }}</span>
+                    </div>
+                    {% endif %}
+                    <div class="flex justify-between">
+                        <span class="text-white/60">Type</span>
+                        <span>{{ image.content_type }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-white/60">Uploaded</span>
+                        <span>{{ image.created_at.strftime('%B %d, %Y') }}</span>
+                    </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-white/20 my-4">
+
+                <!-- Actions -->
+                <div class="space-y-3">
+                    <!-- Copy Link -->
+                    <button
+                        onclick="copyLink()"
+                        class="w-full bg-white/10 hover:bg-white/20 text-white py-2.5 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                        </svg>
+                        <span id="copy-text">Copy Link</span>
+                    </button>
+
+                    <!-- Download -->
+                    <a
+                        href="/api/v1/images/{{ image.id }}/file"
+                        download="{{ image.filename }}"
+                        class="w-full bg-terracotta-500 hover:bg-terracotta-600 text-white py-2.5 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/>
+                        </svg>
+                        <span>Download</span>
+                    </a>
+
+                    {% if is_owner %}
+                    <!-- Delete (Owner only) -->
+                    <button
+                        onclick="confirmDelete()"
+                        class="w-full bg-red-500/20 hover:bg-red-500/30 text-red-300 py-2.5 px-4 rounded-lg font-medium transition-colors flex items-center justify-center space-x-2"
+                    >
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                        <span>Delete</span>
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Delete Confirmation Modal -->
+    <div id="delete-modal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+        <div class="glass rounded-2xl p-6 max-w-sm w-full text-white">
+            <h2 class="font-display text-xl font-semibold mb-2">Delete Image?</h2>
+            <p class="text-white/70 mb-6">This action cannot be undone.</p>
+            <div class="flex space-x-3">
+                <button
+                    onclick="closeModal()"
+                    class="flex-1 bg-white/10 hover:bg-white/20 py-2 px-4 rounded-lg font-medium transition-colors"
+                >
+                    Cancel
+                </button>
+                <form action="/api/v1/images/{{ image.id }}" method="POST" class="flex-1">
+                    <input type="hidden" name="_method" value="DELETE">
+                    <button
+                        type="submit"
+                        hx-delete="/api/v1/images/{{ image.id }}"
+                        hx-confirm="false"
+                        class="w-full bg-red-500 hover:bg-red-600 py-2 px-4 rounded-lg font-medium transition-colors"
+                    >
+                        Delete
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyLink() {
+            const url = window.location.origin + '/api/v1/images/{{ image.id }}/file';
+            navigator.clipboard.writeText(url).then(() => {
+                const copyText = document.getElementById('copy-text');
+                copyText.textContent = 'Copied!';
+                setTimeout(() => {
+                    copyText.textContent = 'Copy Link';
+                }, 2000);
+            });
+        }
+
+        function confirmDelete() {
+            document.getElementById('delete-modal').classList.remove('hidden');
+        }
+
+        function closeModal() {
+            document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        // Close modal on escape
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                closeModal();
+            }
+        });
+
+        // Close modal on backdrop click
+        document.getElementById('delete-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'delete-modal') {
+                closeModal();
+            }
+        });
+    </script>
+</body>
+</html>

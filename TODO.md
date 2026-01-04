@@ -351,38 +351,160 @@ asyncio.run(main())
 **Goal:** Add web-based user interface using HTMX and Jinja2 templates
 **Status:** 📋 Planned
 **Branch:** `feature/phase-3-ui`
-**Prerequisites:** Phase 2A Auth complete ✅, Phase 2B Thumbnails (optional but recommended)
+**Prerequisites:** Phase 2A Auth complete ✅, Phase 2B Thumbnails complete ✅
+**Estimated Effort:** 4-6 working days
 
-> **Architecture Decision:** HTMX + Jinja2 + TailwindCSS in monorepo. See [ADR-0013](docs/adr/0013-web-ui-htmx.md).
+> **Architecture Decisions:**
+> - [ADR-0013: Web UI with HTMX](docs/adr/0013-web-ui-htmx.md) - Technology choice
+> - [ADR-0015: UI Design System](docs/adr/0015-ui-design-system.md) - Warm Minimal theme
 
 **Why This Matters for Users:**
 - Visual gallery to browse images
 - Easy upload via drag-and-drop
 - User dashboard to manage their images
 
-### 🔬 Spike: UI Layout Design (Pre-Implementation)
+**Design Documents:**
+- [UI Design Spec](docs/architecture/ui-design-doc.md) - Full mockup analysis, wireframes, component patterns
 
-> **Status:** 🔴 Not Started
-> **Goal:** Design wireframes and finalize UI/UX decisions before implementation
+---
 
-**Questions to Answer:**
-- [ ] What is the overall visual style? (Minimal, colorful, dark mode?)
-- [ ] What are the exact page layouts and component placements?
-- [ ] Mobile-first or desktop-first responsive approach?
-- [ ] Color scheme and typography choices?
-- [ ] Navigation flow and user journey mapping?
+### 🔬 Spike: UI Layout Design ✅ COMPLETE
 
-**Deliverables:**
-- [ ] Low-fidelity wireframes for all pages
-- [ ] Component inventory (buttons, cards, forms, modals)
-- [ ] Navigation/routing diagram
-- [ ] Color palette and typography selection
-- [ ] Mobile vs Desktop layout comparison
-- [ ] Decision on TailwindCSS theme customization
+> **Status:** ✅ Complete
+> **Outcome:** Warm Minimal theme selected, design system documented
 
-**References:**
-- Similar apps for inspiration: Imgur, Unsplash, Postimages
-- TailwindCSS component libraries: DaisyUI, Headless UI, Flowbite
+**Decisions Made:**
+- [x] Visual style: **Warm Minimal** (cream bg, terracotta accents, serif logo)
+- [x] Page layouts: Masonry gallery, glassmorphism detail view
+- [x] Responsive: Desktop-first with Tailwind breakpoints
+- [x] Colors: Terracotta (#C4956A), Cream (#FAF8F5)
+- [x] Typography: Playfair Display (headings), Source Sans 3 (body)
+- [x] TailwindCSS: CDN with custom config (no build step for MVP)
+
+**MVP Scope Decisions:**
+| Feature | Decision | Rationale |
+|---------|----------|-----------|
+| Image titles | Use filename | Already in API |
+| EXIF data | Defer to Part 2 | Requires backend work |
+| Color palette | Defer to Part 2 | Additional service needed |
+| Tags/hashtags | Defer to Part 2 | New DB tables |
+| Filters sidebar | Omit for MVP | Keep simple |
+| Pagination | "Load More" button | HTMX-friendly |
+
+---
+
+### Phase 3A: Foundation (Days 1-2) ✅ COMPLETE
+
+> **Status:** ✅ Complete (2026-01-03)
+> **Branch:** `feature/phase3A-foundation`
+> **Runbook:** [docs/PHASE3_UI_RUNBOOK.md](docs/PHASE3_UI_RUNBOOK.md)
+
+- [x] **FastAPI Template Setup:**
+  - [x] Add `jinja2` dependency to pyproject.toml
+  - [x] Configure Jinja2Templates in main.py
+  - [x] Mount static files directory
+  - [x] Create `backend/app/templates/` directory
+  - [x] Create `backend/app/static/` directory
+- [x] **Base Template:**
+  - [x] `base.html` with TailwindCSS CDN config
+  - [x] Google Fonts (Playfair Display, Source Sans 3)
+  - [x] HTMX script include
+  - [x] Custom Tailwind colors (terracotta, cream)
+- [x] **Navigation Partial:**
+  - [x] `partials/nav.html` - Logo, nav links
+  - [x] Conditional auth state (Login vs Profile)
+  - [x] Mobile hamburger menu (responsive)
+- [x] **Cookie-Based Auth:**
+  - [x] Create `get_current_user_from_cookie` dependency
+  - [ ] ⏳ Migrate to httpOnly cookies (currently JS-accessible)
+  - [ ] ⏳ Add CSRF protection middleware
+- [x] **Web Router:**
+  - [x] Create `backend/app/api/web.py`
+  - [x] All page routes implemented
+
+---
+
+### Phase 3B: Core Pages (Days 2-4) ✅ COMPLETE
+
+> **Status:** ✅ Complete (2026-01-03) - Implemented alongside 3A
+
+- [x] **Gallery Page (`home.html`):**
+  - [x] CSS columns masonry layout
+  - [x] Fetch recent images from API
+  - [x] Thumbnail cards with hover effect
+  - [x] "Load More" button (HTMX)
+  - [x] `partials/gallery_item.html` for HTMX swap
+- [x] **Image Detail Page (`image.html`):**
+  - [x] Dark background with glassmorphism card
+  - [x] Full-size image display
+  - [x] Metadata panel (filename, size, dimensions, date)
+  - [x] "Copy Link" button (JS clipboard)
+  - [x] "Download" button
+  - [x] Delete button (owner only, HTMX confirm)
+- [x] **Upload Form (`upload.html`):**
+  - [x] File input with drag-and-drop zone
+  - [x] File preview before upload
+  - [x] Client-side validation (type, size)
+  - [x] JS form submission (fetch API)
+  - [x] Progress indicator
+  - [x] Redirect to detail on success
+
+---
+
+### Phase 3C: Auth + Dashboard (Days 4-5) ✅ COMPLETE
+
+> **Status:** ✅ Complete (2026-01-03) - Implemented alongside 3A
+
+- [x] **Login Page (`login.html`):**
+  - [x] Email + password form
+  - [x] JS form submission (fetch API)
+  - [x] Inline error display
+  - [x] Link to registration
+  - [x] Set JWT cookie on success
+- [x] **Register Page (`register.html`):**
+  - [x] Email + password form
+  - [x] Client-side password validation
+  - [x] JS form submission (fetch API)
+  - [x] Auto-login on success
+- [x] **Logout:**
+  - [x] Clear JWT cookie
+  - [x] Redirect to home
+- [x] **My Images Page (`my_images.html`):**
+  - [x] Profile header (email, image count)
+  - [x] Filtered gallery grid (user's images only)
+  - [x] Delete button on each card
+  - [x] JS delete with confirmation modal
+- [x] **Anonymous Upload Flow:**
+  - [x] Warning message about saving token (in upload form)
+  - [ ] ⏳ Display delete token prominently after upload
+  - [ ] ⏳ Copy token button
+
+---
+
+### Phase 3D: Polish (Day 6)
+
+> **Status:** 🟡 Partially Complete
+
+- [x] **Responsive Design:**
+  - [x] Mobile breakpoints (< 640px) - CSS columns
+  - [x] Tablet breakpoints (640-1024px) - CSS columns
+  - [ ] Test all pages on mobile/tablet/desktop
+- [x] **Error Handling:**
+  - [x] Inline error messages in forms
+  - [x] 404 page template
+  - [ ] ⏳ `partials/toast.html` for global messages
+  - [ ] ⏳ HTMX error event handling
+  - [ ] ⏳ JWT expiry → redirect to login
+- [x] **Accessibility:**
+  - [x] Alt text on all images (filename)
+  - [x] Form labels
+  - [ ] ⏳ Keyboard navigation audit
+  - [ ] ⏳ Focus states audit
+- [ ] **Testing:**
+  - [ ] Template route tests
+  - [ ] Auth flow tests (cookie-based)
+  - [ ] HTMX interaction tests
+  - [ ] Responsive layout verification
 
 ---
 
