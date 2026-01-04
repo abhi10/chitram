@@ -10,7 +10,8 @@ deploy/
 ├── .env.production.example      # Environment template (copy to .env.production)
 ├── docker-compose.yml           # Production compose with Caddy
 ├── docker-compose.local.yml     # Local override (exposes ports, no Caddy)
-└── Caddyfile                    # Reverse proxy configuration
+├── Caddyfile                    # Reverse proxy configuration
+└── validate-local.sh            # Automated local validation script
 ```
 
 ## Quick Start
@@ -20,7 +21,10 @@ deploy/
 ```bash
 cd deploy
 
-# Start with local overrides (exposes all ports, no SSL)
+# Option 1: Automated validation (recommended)
+./validate-local.sh
+
+# Option 2: Manual start
 docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 
 # Access:
@@ -29,6 +33,9 @@ docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
 # - MinIO Console: http://localhost:9003 (minioadmin/minioadmin)
 # - PostgreSQL:    localhost:5433
 # - Redis:         localhost:6380
+
+# Cleanup
+./validate-local.sh --cleanup
 ```
 
 ### Production Deployment
