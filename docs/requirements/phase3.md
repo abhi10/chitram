@@ -235,31 +235,51 @@ backend/
 Phase 3 is considered complete when:
 
 ### Public Pages
-- [ ] Home page shows gallery of images with thumbnails
-- [ ] Image detail page shows full image and metadata
-- [ ] Navigation bar present on all pages
+- [x] Home page shows gallery of images with thumbnails ✅
+- [x] Image detail page shows full image and metadata ✅
+- [x] Navigation bar present on all pages ✅
 
 ### Authentication
-- [ ] Registration form works
-- [ ] Login form works
-- [ ] JWT stored in httpOnly cookie
-- [ ] Logout clears token
+- [x] Registration form works ✅
+- [x] Login form works ✅
+- [ ] JWT stored in httpOnly cookie ⏳ (currently JS-accessible)
+- [x] Logout clears token ✅
 
 ### Upload
-- [ ] Upload form works (logged in and anonymous)
-- [ ] Drag-and-drop works
-- [ ] Delete token shown for anonymous uploads
-- [ ] Validation errors displayed
+- [x] Upload form works (logged in and anonymous) ✅
+- [x] Drag-and-drop works ✅
+- [ ] Delete token shown for anonymous uploads ⏳
+- [x] Validation errors displayed ✅
 
 ### User Dashboard
-- [ ] My Images page shows user's uploads
-- [ ] Delete button works with confirmation
+- [x] My Images page shows user's uploads ✅
+- [x] Delete button works with confirmation ✅
 
 ### Technical
-- [ ] HTMX used for partial updates
-- [ ] Responsive design (mobile/tablet/desktop)
-- [ ] All forms have CSRF protection
-- [ ] Tests for template routes
+- [x] HTMX used for partial updates ✅ (Load More)
+- [x] Responsive design (mobile/tablet/desktop) ✅ (CSS columns)
+- [ ] All forms have CSRF protection ⏳
+- [ ] Tests for template routes ⏳
+
+---
+
+## Implementation Status
+
+| Phase | Status | Completion |
+|-------|--------|------------|
+| Phase 3A: Foundation | ✅ Complete | 100% |
+| Phase 3B: Core Pages | ✅ Complete | 100% |
+| Phase 3C: Auth + Dashboard | ✅ Complete | 90% |
+| Phase 3D: Polish | 🟡 In Progress | 60% |
+
+**Remaining Items:**
+- httpOnly cookies (security hardening)
+- CSRF protection middleware
+- Delete token display for anonymous uploads
+- Template route tests
+- Accessibility audit
+
+**Runbook:** [docs/PHASE3_UI_RUNBOOK.md](../PHASE3_UI_RUNBOOK.md)
 
 ---
 
@@ -268,6 +288,7 @@ Phase 3 is considered complete when:
 | Version | Date | Changes |
 |---------|------|---------|
 | 1.0 | 2026-01-03 | Initial Phase 3 UI requirements |
+| 1.1 | 2026-01-03 | Added implementation status (Phase 3A-C complete) |
 
 ---
 

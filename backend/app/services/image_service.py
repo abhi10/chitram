@@ -7,7 +7,7 @@ import uuid
 from typing import TYPE_CHECKING
 
 from PIL import Image as PILImage
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.image import Image
@@ -141,6 +141,37 @@ class ImageService:
             await self.cache.set_image_metadata(image.id, self._image_to_dict(image))
 
         return image, delete_token
+
+    async def list_recent(self, limit: int = 20, offset: int = 0) -> list[Image]:
+        """
+        List recent images ordered by creation date (newest first).
+
+        Args:
+            limit: Maximum number of images to return
+            offset: Number of images to skip
+
+        Returns:
+            List of Image models
+        """
+        result = await self.db.execute(
+            select(Image).order_by(desc(Image.created_at)).offset(offset).limit(limit)
+        )
+        return list(result.scalars().all())
+
+    async def list_by_user(self, user_id: str) -> list[Image]:
+        """
+        List all images uploaded by a specific user.
+
+        Args:
+            user_id: User ID to filter by
+
+        Returns:
+            List of Image models ordered by creation date (newest first)
+        """
+        result = await self.db.execute(
+            select(Image).where(Image.user_id == user_id).order_by(desc(Image.created_at))
+        )
+        return list(result.scalars().all())
 
     async def get_by_id(self, image_id: str, use_cache: bool = True) -> Image | None:
         """

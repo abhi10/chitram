@@ -1,26 +1,40 @@
-"""Web UI routes using Jinja2 templates."""
+"""Web UI routes using Jinja2 templates.
 
-from pathlib import Path
+This module handles server-rendered HTML pages using HTMX + Jinja2.
+All data access goes through ImageService for loose coupling.
+"""
 
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
-from fastapi.templating import Jinja2Templates
-from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.dependencies import get_cache
+from app.api.images import get_storage
 from app.database import get_db
-from app.models.image import Image
 from app.models.user import User
 from app.services.auth_service import AuthService
+from app.services.cache_service import CacheService
+from app.services.image_service import ImageService
+from app.services.storage_service import StorageService
 
 router = APIRouter(tags=["web"])
 
-# Template configuration
-BASE_DIR = Path(__file__).resolve().parent.parent
-templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
-
 # Cookie name for JWT token
 AUTH_COOKIE_NAME = "chitram_auth"
+
+
+# =============================================================================
+# Dependencies
+# =============================================================================
+
+
+def get_image_service(
+    db: AsyncSession = Depends(get_db),
+    storage: StorageService = Depends(get_storage),
+    cache: CacheService | None = Depends(get_cache),
+) -> ImageService:
+    """Dependency to get image service."""
+    return ImageService(db=db, storage=storage, cache=cache)
 
 
 async def get_current_user_from_cookie(
@@ -28,17 +42,30 @@ async def get_current_user_from_cookie(
     db: AsyncSession = Depends(get_db),
 ) -> User | None:
     """
-    Get current user from httpOnly cookie.
+    Get current user from auth cookie.
 
-    Returns None if not authenticated (no cookie or invalid token).
-    Does not raise exception for anonymous access.
+    Extracts JWT from cookie and delegates to AuthService.
+    Returns None if not authenticated (allows anonymous access).
     """
     token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token:
         return None
 
     auth_service = AuthService(db)
-    return await auth_service.get_current_user(token)
+    user_id = auth_service.verify_token(token)
+    if not user_id:
+        return None
+
+    user = await auth_service.get_user_by_id(user_id)
+    if not user or not user.is_active:
+        return None
+
+    return user
+
+
+def get_templates(request: Request):
+    """Get templates from app state (configured in main.py)."""
+    return request.app.state.templates
 
 
 # =============================================================================
@@ -49,25 +76,17 @@ async def get_current_user_from_cookie(
 @router.get("/", response_class=HTMLResponse)
 async def home(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    service: ImageService = Depends(get_image_service),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """
-    Home page - Gallery of recent public images.
-
-    Shows thumbnails in a masonry grid layout.
-    """
-    # Fetch recent images (limit 20 for initial load)
-    result = await db.execute(select(Image).order_by(desc(Image.created_at)).limit(20))
-    images = result.scalars().all()
+    """Home page - Gallery of recent images."""
+    images = await service.list_recent(limit=20)
+    templates = get_templates(request)
 
     return templates.TemplateResponse(
         request=request,
         name="home.html",
-        context={
-            "images": images,
-            "user": current_user,
-        },
+        context={"images": images, "user": user},
     )
 
 
@@ -75,49 +94,41 @@ async def home(
 async def image_detail(
     request: Request,
     image_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    service: ImageService = Depends(get_image_service),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """
-    Image detail page - Full image with metadata.
-
-    Dark background with glassmorphism card.
-    """
-    result = await db.execute(select(Image).where(Image.id == image_id))
-    image = result.scalar_one_or_none()
+    """Image detail page - Full image with metadata."""
+    image = await service.get_by_id(image_id)
+    templates = get_templates(request)
 
     if not image:
         return templates.TemplateResponse(
             request=request,
             name="404.html",
-            context={"user": current_user, "message": "Image not found"},
+            context={"user": user, "message": "Image not found"},
             status_code=404,
         )
 
-    # Check if current user is the owner
-    is_owner = current_user and image.user_id and image.user_id == current_user.id
+    is_owner = user and image.user_id and image.user_id == user.id
 
     return templates.TemplateResponse(
         request=request,
         name="image.html",
-        context={
-            "image": image,
-            "user": current_user,
-            "is_owner": is_owner,
-        },
+        context={"image": image, "user": user, "is_owner": is_owner},
     )
 
 
 @router.get("/upload", response_class=HTMLResponse)
 async def upload_page(
     request: Request,
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
     """Upload page - Form to upload a new image."""
+    templates = get_templates(request)
     return templates.TemplateResponse(
         request=request,
         name="upload.html",
-        context={"user": current_user},
+        context={"user": user},
     )
 
 
@@ -129,13 +140,13 @@ async def upload_page(
 @router.get("/login", response_class=HTMLResponse)
 async def login_page(
     request: Request,
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Login page - Email and password form."""
-    # Redirect if already logged in
-    if current_user:
+    """Login page - Redirect if already authenticated."""
+    if user:
         return RedirectResponse(url="/", status_code=302)
 
+    templates = get_templates(request)
     return templates.TemplateResponse(
         request=request,
         name="login.html",
@@ -146,13 +157,13 @@ async def login_page(
 @router.get("/register", response_class=HTMLResponse)
 async def register_page(
     request: Request,
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Registration page - Create new account form."""
-    # Redirect if already logged in
-    if current_user:
+    """Registration page - Redirect if already authenticated."""
+    if user:
         return RedirectResponse(url="/", status_code=302)
 
+    templates = get_templates(request)
     return templates.TemplateResponse(
         request=request,
         name="register.html",
@@ -161,10 +172,8 @@ async def register_page(
 
 
 @router.post("/logout")
-async def logout(response: Response):
-    """
-    Logout - Clear auth cookie and redirect to home.
-    """
+async def logout():
+    """Logout - Clear auth cookie and redirect to home."""
     response = RedirectResponse(url="/", status_code=302)
     response.delete_cookie(AUTH_COOKIE_NAME)
     return response
@@ -178,31 +187,20 @@ async def logout(response: Response):
 @router.get("/my-images", response_class=HTMLResponse)
 async def my_images(
     request: Request,
-    db: AsyncSession = Depends(get_db),
-    current_user: User | None = Depends(get_current_user_from_cookie),
+    service: ImageService = Depends(get_image_service),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """
-    My Images page - User's uploaded images.
-
-    Requires authentication.
-    """
-    if not current_user:
+    """My Images page - User's uploaded images (requires auth)."""
+    if not user:
         return RedirectResponse(url="/login", status_code=302)
 
-    # Fetch user's images
-    result = await db.execute(
-        select(Image).where(Image.user_id == current_user.id).order_by(desc(Image.created_at))
-    )
-    images = result.scalars().all()
+    images = await service.list_by_user(user.id)
+    templates = get_templates(request)
 
     return templates.TemplateResponse(
         request=request,
         name="my_images.html",
-        context={
-            "images": images,
-            "user": current_user,
-            "image_count": len(images),
-        },
+        context={"images": images, "user": user, "image_count": len(images)},
     )
 
 
@@ -216,17 +214,11 @@ async def gallery_partial(
     request: Request,
     offset: int = 0,
     limit: int = 20,
-    db: AsyncSession = Depends(get_db),
+    service: ImageService = Depends(get_image_service),
 ):
-    """
-    Gallery partial - Load more images for infinite scroll/pagination.
-
-    Used by HTMX for "Load More" functionality.
-    """
-    result = await db.execute(
-        select(Image).order_by(desc(Image.created_at)).offset(offset).limit(limit)
-    )
-    images = result.scalars().all()
+    """Gallery partial - Load more images for HTMX infinite scroll."""
+    images = await service.list_recent(limit=limit, offset=offset)
+    templates = get_templates(request)
 
     return templates.TemplateResponse(
         request=request,

@@ -393,103 +393,113 @@ asyncio.run(main())
 
 ---
 
-### Phase 3A: Foundation (Days 1-2)
+### Phase 3A: Foundation (Days 1-2) ✅ COMPLETE
 
-- [ ] **FastAPI Template Setup:**
-  - [ ] Add `jinja2` dependency to pyproject.toml
-  - [ ] Configure Jinja2Templates in main.py
-  - [ ] Mount static files directory
-  - [ ] Create `backend/app/templates/` directory
-  - [ ] Create `backend/app/static/` directory
-- [ ] **Base Template:**
-  - [ ] `base.html` with TailwindCSS CDN config
-  - [ ] Google Fonts (Playfair Display, Source Sans 3)
-  - [ ] HTMX script include
-  - [ ] Custom Tailwind colors (terracotta, cream)
-- [ ] **Navigation Partial:**
-  - [ ] `partials/nav.html` - Logo, nav links
-  - [ ] Conditional auth state (Login vs Profile)
-  - [ ] Mobile hamburger menu (responsive)
-- [ ] **Cookie-Based Auth:**
-  - [ ] Modify auth to use httpOnly cookies
-  - [ ] Add CSRF protection middleware
-  - [ ] Create `get_current_user_from_cookie` dependency
-- [ ] **Web Router:**
-  - [ ] Create `backend/app/api/web.py`
-  - [ ] Basic route: `GET /` → home.html
+> **Status:** ✅ Complete (2026-01-03)
+> **Branch:** `feature/phase3A-foundation`
+> **Runbook:** [docs/PHASE3_UI_RUNBOOK.md](docs/PHASE3_UI_RUNBOOK.md)
 
----
-
-### Phase 3B: Core Pages (Days 2-4)
-
-- [ ] **Gallery Page (`home.html`):**
-  - [ ] CSS columns masonry layout
-  - [ ] Fetch recent images from API
-  - [ ] Thumbnail cards with hover effect
-  - [ ] "Load More" button (HTMX)
-  - [ ] `partials/gallery_item.html` for HTMX swap
-- [ ] **Image Detail Page (`image.html`):**
-  - [ ] Dark background with glassmorphism card
-  - [ ] Full-size image display
-  - [ ] Metadata panel (filename, size, dimensions, date)
-  - [ ] "Copy Link" button (JS clipboard)
-  - [ ] "Download" button
-  - [ ] Delete button (owner only, HTMX confirm)
-- [ ] **Upload Form (`upload.html`):**
-  - [ ] File input with drag-and-drop zone
-  - [ ] File preview before upload
-  - [ ] Client-side validation (type, size)
-  - [ ] HTMX form submission
-  - [ ] Progress indicator
-  - [ ] `partials/upload_progress.html`
-  - [ ] Redirect to detail on success
+- [x] **FastAPI Template Setup:**
+  - [x] Add `jinja2` dependency to pyproject.toml
+  - [x] Configure Jinja2Templates in main.py
+  - [x] Mount static files directory
+  - [x] Create `backend/app/templates/` directory
+  - [x] Create `backend/app/static/` directory
+- [x] **Base Template:**
+  - [x] `base.html` with TailwindCSS CDN config
+  - [x] Google Fonts (Playfair Display, Source Sans 3)
+  - [x] HTMX script include
+  - [x] Custom Tailwind colors (terracotta, cream)
+- [x] **Navigation Partial:**
+  - [x] `partials/nav.html` - Logo, nav links
+  - [x] Conditional auth state (Login vs Profile)
+  - [x] Mobile hamburger menu (responsive)
+- [x] **Cookie-Based Auth:**
+  - [x] Create `get_current_user_from_cookie` dependency
+  - [ ] ⏳ Migrate to httpOnly cookies (currently JS-accessible)
+  - [ ] ⏳ Add CSRF protection middleware
+- [x] **Web Router:**
+  - [x] Create `backend/app/api/web.py`
+  - [x] All page routes implemented
 
 ---
 
-### Phase 3C: Auth + Dashboard (Days 4-5)
+### Phase 3B: Core Pages (Days 2-4) ✅ COMPLETE
 
-- [ ] **Login Page (`login.html`):**
-  - [ ] Email + password form
-  - [ ] HTMX form submission
-  - [ ] Inline error display
-  - [ ] Link to registration
-  - [ ] Set JWT cookie on success
-- [ ] **Register Page (`register.html`):**
-  - [ ] Email + password form
-  - [ ] Client-side email validation
-  - [ ] HTMX form submission
-  - [ ] Auto-login on success
-- [ ] **Logout:**
-  - [ ] Clear JWT cookie
-  - [ ] Redirect to home
-- [ ] **My Images Page (`my_images.html`):**
-  - [ ] Profile header (email, image count)
-  - [ ] Filtered gallery grid (user's images only)
-  - [ ] Delete button on each card
-  - [ ] HTMX delete with confirmation modal
-- [ ] **Anonymous Upload Flow:**
-  - [ ] Display delete token prominently
-  - [ ] Warning message about saving token
-  - [ ] Copy token button
+> **Status:** ✅ Complete (2026-01-03) - Implemented alongside 3A
+
+- [x] **Gallery Page (`home.html`):**
+  - [x] CSS columns masonry layout
+  - [x] Fetch recent images from API
+  - [x] Thumbnail cards with hover effect
+  - [x] "Load More" button (HTMX)
+  - [x] `partials/gallery_item.html` for HTMX swap
+- [x] **Image Detail Page (`image.html`):**
+  - [x] Dark background with glassmorphism card
+  - [x] Full-size image display
+  - [x] Metadata panel (filename, size, dimensions, date)
+  - [x] "Copy Link" button (JS clipboard)
+  - [x] "Download" button
+  - [x] Delete button (owner only, HTMX confirm)
+- [x] **Upload Form (`upload.html`):**
+  - [x] File input with drag-and-drop zone
+  - [x] File preview before upload
+  - [x] Client-side validation (type, size)
+  - [x] JS form submission (fetch API)
+  - [x] Progress indicator
+  - [x] Redirect to detail on success
+
+---
+
+### Phase 3C: Auth + Dashboard (Days 4-5) ✅ COMPLETE
+
+> **Status:** ✅ Complete (2026-01-03) - Implemented alongside 3A
+
+- [x] **Login Page (`login.html`):**
+  - [x] Email + password form
+  - [x] JS form submission (fetch API)
+  - [x] Inline error display
+  - [x] Link to registration
+  - [x] Set JWT cookie on success
+- [x] **Register Page (`register.html`):**
+  - [x] Email + password form
+  - [x] Client-side password validation
+  - [x] JS form submission (fetch API)
+  - [x] Auto-login on success
+- [x] **Logout:**
+  - [x] Clear JWT cookie
+  - [x] Redirect to home
+- [x] **My Images Page (`my_images.html`):**
+  - [x] Profile header (email, image count)
+  - [x] Filtered gallery grid (user's images only)
+  - [x] Delete button on each card
+  - [x] JS delete with confirmation modal
+- [x] **Anonymous Upload Flow:**
+  - [x] Warning message about saving token (in upload form)
+  - [ ] ⏳ Display delete token prominently after upload
+  - [ ] ⏳ Copy token button
 
 ---
 
 ### Phase 3D: Polish (Day 6)
 
-- [ ] **Responsive Design:**
-  - [ ] Mobile breakpoints (< 640px)
-  - [ ] Tablet breakpoints (640-1024px)
+> **Status:** 🟡 Partially Complete
+
+- [x] **Responsive Design:**
+  - [x] Mobile breakpoints (< 640px) - CSS columns
+  - [x] Tablet breakpoints (640-1024px) - CSS columns
   - [ ] Test all pages on mobile/tablet/desktop
-- [ ] **Error Handling:**
-  - [ ] `partials/toast.html` for error/success messages
-  - [ ] HTMX error event handling
-  - [ ] 404 page template
-  - [ ] JWT expiry → redirect to login
-- [ ] **Accessibility:**
-  - [ ] Alt text on all images (filename)
-  - [ ] Form labels for screen readers
-  - [ ] Keyboard navigation
-  - [ ] Focus states
+- [x] **Error Handling:**
+  - [x] Inline error messages in forms
+  - [x] 404 page template
+  - [ ] ⏳ `partials/toast.html` for global messages
+  - [ ] ⏳ HTMX error event handling
+  - [ ] ⏳ JWT expiry → redirect to login
+- [x] **Accessibility:**
+  - [x] Alt text on all images (filename)
+  - [x] Form labels
+  - [ ] ⏳ Keyboard navigation audit
+  - [ ] ⏳ Focus states audit
 - [ ] **Testing:**
   - [ ] Template route tests
   - [ ] Auth flow tests (cookie-based)

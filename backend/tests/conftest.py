@@ -12,8 +12,10 @@ import io
 import os
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
+from pathlib import Path
 
 import pytest
+from fastapi.templating import Jinja2Templates
 from httpx import ASGITransport, AsyncClient
 from PIL import Image as PILImage
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
@@ -25,6 +27,9 @@ from app.services.concurrency import UploadSemaphore, set_upload_semaphore
 from app.services.rate_limiter import RateLimiter, set_rate_limiter
 from app.services.storage_service import LocalStorageBackend, StorageService
 from app.services.thumbnail_service import ThumbnailService
+
+# Template path for tests (same as production)
+TEMPLATES_DIR = Path(__file__).resolve().parent.parent / "app" / "templates"
 
 
 @dataclass
@@ -202,6 +207,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     app.state.cache = test_deps.cache
     app.state.rate_limiter = test_deps.rate_limiter
     app.state.upload_semaphore = test_deps.upload_semaphore
+    app.state.templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
 
     # Also set the module-level globals for dependencies that use them
     set_cache(test_deps.cache)
@@ -219,6 +225,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     app.state.cache = None
     app.state.rate_limiter = None
     app.state.upload_semaphore = None
+    app.state.templates = None
     set_cache(None)
     set_rate_limiter(None)
     set_upload_semaphore(None)

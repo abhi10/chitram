@@ -130,6 +130,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     app.state.thumbnail_service = thumbnail_service
     print("✅ Thumbnail service initialized")
 
+    # Store templates in app.state for web routes (single source of truth)
+    app.state.templates = templates
+
     print("✅ Image Hosting API ready!")
 
     yield
