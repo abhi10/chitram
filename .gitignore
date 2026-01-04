@@ -15,7 +15,11 @@ build/
 # Environment
 .env
 .env.local
+.env.production
 *.local
+
+# Deploy secrets (NEVER commit)
+deploy/.env.production
 
 # IDE
 .idea/

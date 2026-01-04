@@ -1,0 +1,35 @@
+# Chitram Local Development Override
+# ===================================
+#
+# Use this for local testing without Caddy/SSL
+#
+# Usage:
+#   docker compose -f docker-compose.yml -f docker-compose.local.yml up -d
+#
+# Or simply:
+#   docker compose -f docker-compose.local.yml up -d
+#
+# This exposes all service ports for debugging and disables Caddy
+
+services:
+  app:
+    ports:
+      - "8000:8000"
+
+  # Disable Caddy for local development
+  caddy:
+    profiles:
+      - production-only
+
+  postgres:
+    ports:
+      - "5433:5432"
+
+  minio:
+    ports:
+      - "9002:9000"   # API
+      - "9003:9001"   # Console
+
+  redis:
+    ports:
+      - "6380:6379"
