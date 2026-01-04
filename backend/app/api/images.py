@@ -267,11 +267,11 @@ async def download_image(
             ).model_dump(),
         )
 
-    data, content_type = result
+    data, content_type, filename = result
     return Response(
         content=data,
         media_type=content_type,
-        headers={"Content-Disposition": f"inline; filename={image_id}"},
+        headers={"Content-Disposition": f'inline; filename="{filename}"'},
     )
 
 

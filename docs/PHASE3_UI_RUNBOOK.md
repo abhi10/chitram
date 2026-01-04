@@ -174,6 +174,67 @@ Add to any page:
 | My Images | ✅ Working | Delete with confirmation |
 | 404 | ✅ Working | Custom error page |
 
+## Docker Deployment (Production)
+
+For a full-stack Docker deployment with all services:
+
+### Quick Start
+
+```bash
+# From project root
+docker-compose -f docker-compose.prod.yml up --build
+```
+
+### Access Points
+
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **Web UI** | http://localhost:8000/ | - |
+| **API Docs** | http://localhost:8000/docs | - |
+| **MinIO Console** | http://localhost:9003 | minioadmin / minioadmin |
+| **PostgreSQL** | localhost:5433 | app / localdev |
+| **Redis** | localhost:6380 | - |
+
+> **Note**: Production ports differ from dev container ports to allow both to run simultaneously.
+
+### What Gets Started
+
+- **app**: FastAPI application with Web UI
+- **postgres**: PostgreSQL 16 database
+- **minio**: S3-compatible object storage
+- **redis**: Cache and rate limiting backend
+- **minio-init**: One-shot container to create bucket
+
+### Stop and Clean Up
+
+```bash
+# Stop containers
+docker-compose -f docker-compose.prod.yml down
+
+# Stop and remove volumes (wipes all data)
+docker-compose -f docker-compose.prod.yml down -v
+```
+
+### View Logs
+
+```bash
+# All services
+docker-compose -f docker-compose.prod.yml logs -f
+
+# Just the app
+docker-compose -f docker-compose.prod.yml logs -f app
+```
+
+### Production Considerations
+
+For actual public deployment:
+
+1. **Change secrets**: Update `JWT_SECRET_KEY`, database password, MinIO credentials
+2. **Use HTTPS**: Put behind a reverse proxy (nginx, Caddy) with SSL
+3. **Secure MinIO**: Remove public bucket policy or restrict access
+4. **External database**: Consider managed PostgreSQL (RDS, Cloud SQL)
+5. **Persistent volumes**: Ensure data volumes are backed up
+
 ## Next Steps (Phase 3B-D)
 
 See [TODO.md](../TODO.md) for remaining Phase 3 tasks:

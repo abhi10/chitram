@@ -1,0 +1,125 @@
+# Production Docker Compose for Chitram Image Hosting App
+# Phase 3: Full stack with Web UI, MinIO, Redis, PostgreSQL
+#
+# Usage:
+#   docker-compose -f docker-compose.prod.yml up --build
+#
+# Access points:
+#   - Web UI:        http://localhost:8000
+#   - API Docs:      http://localhost:8000/docs
+#   - MinIO Console: http://localhost:9001 (minioadmin/minioadmin)
+
+services:
+  app:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      # Database
+      - DATABASE_URL=postgresql+asyncpg://app:localdev@postgres:5432/imagehost
+
+      # Storage (MinIO)
+      - STORAGE_BACKEND=minio
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - MINIO_BUCKET=images
+      - MINIO_SECURE=false
+
+      # Redis Cache
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CACHE_ENABLED=true
+      - CACHE_TTL_SECONDS=3600
+
+      # Rate Limiting
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_PER_MINUTE=30
+
+      # App Settings
+      - DEBUG=false
+      - JWT_SECRET_KEY=production-change-this-secret-key
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 10s
+      retries: 3
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: app
+      POSTGRES_PASSWORD: localdev
+      POSTGRES_DB: imagehost
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"  # Use 5433 on host to avoid conflict
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app -d imagehost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  minio:
+    image: minio/minio:latest
+    ports:
+      - "9002:9000"   # API (9002 on host to avoid conflict)
+      - "9003:9001"   # Console (9003 on host to avoid conflict)
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  # MinIO bucket initialization
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      mc mb myminio/images --ignore-existing;
+      mc anonymous set public myminio/images;
+      echo 'Bucket initialized successfully';
+      "
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"  # Use 6380 on host to avoid conflict
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  minio-data:
+  redis-data:
