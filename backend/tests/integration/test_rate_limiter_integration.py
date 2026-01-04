@@ -85,7 +85,7 @@ class TestRateLimiterIntegration:
         # First 10 requests should all be allowed
         for i in range(10):
             result = await rate_limiter.check(test_ip)
-            assert result.allowed is True, f"Request {i+1} should be allowed"
+            assert result.allowed is True, f"Request {i + 1} should be allowed"
             assert result.current_count == i + 1
             assert result.remaining == 10 - (i + 1)
 

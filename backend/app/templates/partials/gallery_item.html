@@ -1,0 +1,19 @@
+<div class="masonry-item">
+    <a href="/image/{{ image.id }}" class="block image-card rounded-lg overflow-hidden bg-white">
+        {% if image.thumbnail_key %}
+            <img
+                src="/api/v1/images/{{ image.id }}/thumbnail"
+                alt="{{ image.filename }}"
+                class="w-full h-auto object-cover"
+                loading="lazy"
+            >
+        {% else %}
+            <img
+                src="/api/v1/images/{{ image.id }}/file"
+                alt="{{ image.filename }}"
+                class="w-full h-auto object-cover"
+                loading="lazy"
+            >
+        {% endif %}
+    </a>
+</div>

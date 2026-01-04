@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Chitram{% endblock %} - Image Hosting</title>
+
+    <!-- Favicon -->
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🖼️</text></svg>">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;600&family=Source+Sans+3:wght@400;500;600&display=swap" rel="stylesheet">
+
+    <!-- TailwindCSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        terracotta: {
+                            50: '#FDF8F4',
+                            100: '#F9EDE3',
+                            200: '#F0D9C7',
+                            300: '#E4BFA3',
+                            400: '#D4A574',
+                            500: '#C4956A',
+                            600: '#B4855A',
+                            700: '#9A7050',
+                            800: '#7D5B42',
+                            900: '#644836',
+                        },
+                        cream: {
+                            50: '#FDFCFA',
+                            100: '#FAF8F5',
+                            200: '#F5F2ED',
+                            300: '#EDE8E0',
+                        }
+                    },
+                    fontFamily: {
+                        display: ['Playfair Display', 'serif'],
+                        sans: ['Source Sans 3', 'sans-serif'],
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- HTMX -->
+    <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
+
+    <!-- Custom Styles -->
+    <style>
+        /* Base styles */
+        body {
+            font-family: 'Source Sans 3', sans-serif;
+        }
+
+        /* Display font for headings */
+        .font-display {
+            font-family: 'Playfair Display', serif;
+        }
+
+        /* Masonry grid using CSS columns */
+        .masonry-grid {
+            column-count: 1;
+            column-gap: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .masonry-grid {
+                column-count: 2;
+                column-gap: 1.25rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .masonry-grid {
+                column-count: 3;
+                column-gap: 1.5rem;
+            }
+        }
+
+        @media (min-width: 1280px) {
+            .masonry-grid {
+                column-count: 4;
+                column-gap: 1.5rem;
+            }
+        }
+
+        .masonry-item {
+            break-inside: avoid;
+            margin-bottom: 1rem;
+        }
+
+        @media (min-width: 640px) {
+            .masonry-item {
+                margin-bottom: 1.25rem;
+            }
+        }
+
+        @media (min-width: 1024px) {
+            .masonry-item {
+                margin-bottom: 1.5rem;
+            }
+        }
+
+        /* Glassmorphism effect */
+        .glass {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        /* Image hover effect */
+        .image-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .image-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1);
+        }
+
+        /* Loading spinner */
+        .htmx-indicator {
+            display: none;
+        }
+
+        .htmx-request .htmx-indicator {
+            display: inline-block;
+        }
+
+        .htmx-request.htmx-indicator {
+            display: inline-block;
+        }
+    </style>
+
+    {% block head %}{% endblock %}
+</head>
+<body class="bg-cream-100 text-gray-800 min-h-screen flex flex-col">
+    <!-- Navigation -->
+    {% include 'partials/nav.html' %}
+
+    <!-- Toast Container -->
+    <div id="toast-container" class="fixed top-4 right-4 z-50 space-y-2">
+        {% block toasts %}{% endblock %}
+    </div>
+
+    <!-- Main Content -->
+    <main class="flex-1 container mx-auto px-4 py-8">
+        {% block content %}{% endblock %}
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-cream-200 border-t border-cream-300 py-6 mt-auto">
+        <div class="container mx-auto px-4 text-center text-gray-600 text-sm">
+            <p>
+                <span class="font-display font-semibold text-terracotta-600">Chitram</span>
+                <span class="mx-2">•</span>
+                చిత్రం - Image in Telugu
+            </p>
+            <p class="mt-2 text-gray-500">
+                A learning project for distributed systems
+            </p>
+        </div>
+    </footer>
+
+    {% block scripts %}{% endblock %}
+</body>
+</html>

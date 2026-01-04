@@ -2,10 +2,13 @@
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.staticfiles import StaticFiles
+from fastapi.templating import Jinja2Templates
 
 # SQLAlchemy exceptions for database error handling
 from sqlalchemy.exc import OperationalError
@@ -14,6 +17,7 @@ from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.images import router as images_router
+from app.api.web import router as web_router
 from app.config import get_settings
 from app.database import async_session_maker, close_db, init_db
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
@@ -28,6 +32,10 @@ from app.services.storage_service import (
 from app.services.thumbnail_service import ThumbnailService
 
 settings = get_settings()
+
+# Template and static file paths
+BASE_DIR = Path(__file__).resolve().parent
+templates = Jinja2Templates(directory=str(BASE_DIR / "templates"))
 
 
 @asynccontextmanager
@@ -198,7 +206,11 @@ async def global_exception_handler(request: Request, exc: Exception) -> JSONResp
     )
 
 
+# Mount static files
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="static")
+
 # Include routers
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(images_router, prefix="/api/v1")
+app.include_router(web_router)  # Web UI routes (no prefix, serves at /)

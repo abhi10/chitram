@@ -216,8 +216,7 @@ class MinioStorageBackend(StorageBackend):
             )
         except TimeoutError:
             logger.error(
-                "MinIO bucket check timed out after %.1f seconds. "
-                "Check MinIO connectivity at %s",
+                "MinIO bucket check timed out after %.1f seconds. Check MinIO connectivity at %s",
                 timeout,
                 self.client._base_url,
             )
