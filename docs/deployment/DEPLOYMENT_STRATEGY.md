@@ -86,20 +86,24 @@ If we exposed FastAPI directly:
 ## Implementation Phases
 
 ### Phase 4A: Security & Secrets (Pre-requisite)
-**Priority: Critical | Effort: 2 hours**
+**Priority: Critical | Effort: 2 hours | Status: COMPLETE**
 
 **Goal:** Externalize all secrets from docker-compose.yml
 
-**Tasks:**
-1. Create `.env.production.example` template
-2. Update `docker-compose.prod.yml` to use environment variables
-3. Document required GitHub Secrets
-4. Generate secure random values for production
+**Files Created:**
+- `deploy/.env.production.example` - Environment template
+- `deploy/docker-compose.yml` - Production compose with env vars
+- `deploy/docker-compose.local.yml` - Local development override
+- `deploy/Caddyfile` - Reverse proxy configuration
+- `deploy/validate-local.sh` - Automated validation script
+- `docs/deployment/SECRETS.md` - Secrets documentation
 
-**Files to Create/Modify:**
-- `deploy/.env.production.example` (template)
-- `docker-compose.prod.yml` (use ${VAR} syntax)
-- `docs/deployment/SECRETS.md` (documentation)
+**How to Test Phase 4A:**
+```bash
+cd deploy
+./validate-local.sh           # Automated: starts containers, health checks
+./validate-local.sh --cleanup # Stop and clean up
+```
 
 **Secrets Required:**
 | Secret | Description | How to Generate |
@@ -112,24 +116,49 @@ If we exposed FastAPI directly:
 ---
 
 ### Phase 4B: CD Pipeline
-**Priority: Critical | Effort: 3 hours**
+**Priority: Critical | Effort: 3 hours | Status: COMPLETE**
 
-**Goal:** Automated deployment on push to main
+**Goal:** Automated deployment on push to main with mandatory pre-deploy testing
 
-**Tasks:**
-1. Create `.github/workflows/deploy.yml`
-2. Set up SSH key authentication
-3. Add deployment scripts
-4. Configure GitHub Secrets for SSH access
-
-**Workflow:**
+**Pipeline Steps:**
 ```
-Push to main → CI passes → SSH to droplet → docker-compose pull → docker-compose up -d
+Push to main
+    │
+    ▼
+┌─────────────────────────────────────────┐
+│  Step 1: Pre-Deploy Tests               │
+│  - Run full test suite (postgres,       │
+│    redis, minio)                        │
+│  - Must pass before deployment          │
+└─────────────────────────────────────────┘
+    │ ✓ Pass
+    ▼
+┌─────────────────────────────────────────┐
+│  Step 2: Build Docker Image             │
+│  - Build and tag image                  │
+│  - Verify image starts successfully     │
+└─────────────────────────────────────────┘
+    │ ✓ Pass
+    ▼
+┌─────────────────────────────────────────┐
+│  Step 3: Deploy to Production           │
+│  - SSH to droplet                       │
+│  - Backup current deployment            │
+│  - Deploy new version                   │
+│  - Health check verification            │
+│  - Auto-rollback on failure             │
+└─────────────────────────────────────────┘
 ```
 
-**Files to Create:**
-- `.github/workflows/deploy.yml`
-- `scripts/deploy.sh` (remote deployment script)
+**Files Created:**
+- `.github/workflows/cd.yml` - Full CD pipeline with tests
+
+**Testing Strategy:**
+| Step | What's Tested | Failure Action |
+|------|---------------|----------------|
+| Pre-Deploy Tests | Full pytest suite with real services | Block deployment |
+| Build | Docker image builds and starts | Block deployment |
+| Deploy | Health check on production | Auto-rollback |
 
 **GitHub Secrets Required:**
 | Secret | Description |
@@ -138,32 +167,36 @@ Push to main → CI passes → SSH to droplet → docker-compose pull → docker
 | `DROPLET_USER` | SSH username (usually `root`) |
 | `DROPLET_SSH_KEY` | Private SSH key |
 
+**How to Test Phase 4B:**
+1. Verify workflow syntax: Push branch, check Actions tab for errors
+2. Without droplet: Tests and build steps will run, deploy will fail (expected)
+3. With droplet: Full pipeline including deployment and health check
+
 ---
 
 ### Phase 4C: Reverse Proxy & SSL
-**Priority: High | Effort: 2 hours**
+**Priority: High | Effort: 2 hours | Status: COMPLETE (included in Phase 4A)**
 
 **Goal:** HTTPS with automatic certificate management
 
-**Tasks:**
-1. Add Caddy service to docker-compose
-2. Create Caddyfile configuration
-3. Update firewall (only expose 80/443)
-4. Remove direct port exposure for internal services
+> **Note:** Caddy configuration was included in Phase 4A implementation.
 
-**Files to Create/Modify:**
-- `deploy/Caddyfile`
-- `docker-compose.prod.yml` (add caddy service)
+**Files Created (in Phase 4A):**
+- `deploy/Caddyfile` - Automatic HTTPS, security headers, compression
+- `deploy/docker-compose.yml` - Includes Caddy service
 
-**Port Changes:**
-| Service | Before | After |
-|---------|--------|-------|
-| App | 8000:8000 | internal only |
-| PostgreSQL | 5433:5432 | internal only |
-| MinIO API | 9002:9000 | internal only |
-| MinIO Console | 9003:9001 | internal only |
-| Redis | 6380:6379 | internal only |
-| Caddy | N/A | 80:80, 443:443 |
+**Port Exposure (Production):**
+| Service | Exposed | Access |
+|---------|---------|--------|
+| Caddy | 80:80, 443:443 | Public (SSL termination) |
+| App | internal only | Via Caddy reverse proxy |
+| PostgreSQL | internal only | Container network |
+| MinIO | internal only | Container network |
+| Redis | internal only | Container network |
+
+**How to Test Phase 4C:**
+1. Local (no SSL): `./validate-local.sh` - uses docker-compose.local.yml
+2. Production: Deploy to droplet with domain → verify https:// works
 
 ---
 
@@ -180,7 +213,7 @@ Push to main → CI passes → SSH to droplet → docker-compose pull → docker
 ---
 
 ### Phase 4E: Backup & Recovery
-**Priority: High | Effort: 3 hours**
+**Priority: High | Effort: 3 hours | Status: PENDING**
 
 **Goal:** Don't lose user data
 
@@ -203,10 +236,17 @@ Push to main → CI passes → SSH to droplet → docker-compose pull → docker
 - `scripts/restore.sh`
 - `docs/deployment/DISASTER_RECOVERY.md`
 
+**How to Test Phase 4E:**
+1. Run backup script manually: `./scripts/backup.sh`
+2. Verify backup files created in backup directory
+3. Delete test data from database
+4. Run restore script: `./scripts/restore.sh <backup-file>`
+5. Verify data restored correctly
+
 ---
 
 ### Phase 4F: Droplet Setup (Manual, One-time)
-**Priority: Required | Effort: 1 hour**
+**Priority: Required | Effort: 1 hour | Status: PENDING**
 
 **Goal:** Provision and configure the production server
 
@@ -216,12 +256,22 @@ Push to main → CI passes → SSH to droplet → docker-compose pull → docker
 3. Configure firewall (ufw)
 4. Set up SSH key authentication
 5. Configure DNS (A record pointing to droplet IP)
+6. Create `.env.production` with real secrets
+7. Add GitHub Secrets for CD pipeline
 
 **Droplet Specs:**
 - **Size:** Basic, 2GB RAM, 2 vCPU, 50GB SSD ($18/month)
 - **Region:** Closest to target users
 - **Image:** Ubuntu 22.04 LTS
 - **Authentication:** SSH keys only (no password)
+
+**How to Test Phase 4F:**
+1. SSH to droplet: `ssh root@<droplet-ip>`
+2. Verify Docker: `docker --version && docker compose version`
+3. Verify firewall: `sudo ufw status` (only 22, 80, 443 open)
+4. Manual deploy test: Copy files, run `docker compose up -d`
+5. Verify health: `curl http://<droplet-ip>:8000/health`
+6. Trigger CD pipeline from GitHub and verify deployment
 
 ---
 
@@ -277,9 +327,9 @@ chitram/
 
 ## Next Steps
 
-1. [ ] Phase 4A: Externalize secrets
-2. [ ] Phase 4B: Create CD pipeline
-3. [ ] Phase 4C: Add Caddy for SSL
+1. [x] Phase 4A: Externalize secrets
+2. [x] Phase 4B: Create CD pipeline
+3. [x] Phase 4C: Add Caddy for SSL (included in 4A)
 4. [ ] ~~Phase 4D: Set up monitoring~~ (DESCOPED for MVP)
 5. [ ] Phase 4E: Create backup scripts
 6. [ ] Phase 4F: Provision droplet (manual)
