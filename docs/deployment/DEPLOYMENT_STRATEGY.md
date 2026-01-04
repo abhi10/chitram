@@ -213,16 +213,14 @@ Push to main
 ---
 
 ### Phase 4E: Backup & Recovery
-**Priority: High | Effort: 3 hours | Status: PENDING**
+**Priority: High | Effort: 3 hours | Status: COMPLETE**
 
 **Goal:** Don't lose user data
 
-**Tasks:**
-1. Create database backup script (pg_dump)
-2. Create MinIO backup script (mc mirror)
-3. Set up cron jobs for automated backups
-4. Document recovery procedures
-5. Test restore process
+**Files Created:**
+- `scripts/backup.sh` - Backup PostgreSQL and MinIO
+- `scripts/restore.sh` - Restore from backup
+- `docs/deployment/DISASTER_RECOVERY.md` - Recovery procedures
 
 **Backup Strategy:**
 | Data | Method | Frequency | Retention |
@@ -231,33 +229,36 @@ Push to main
 | MinIO (images) | mc mirror | Daily | 7 days |
 | Redis | Not backed up | N/A | Cache only, rebuilds |
 
-**Files to Create:**
-- `scripts/backup.sh`
-- `scripts/restore.sh`
-- `docs/deployment/DISASTER_RECOVERY.md`
+**Usage:**
+```bash
+# Create backup
+./scripts/backup.sh
+
+# List backups
+./scripts/backup.sh --list
+
+# Restore
+./scripts/restore.sh YYYYMMDD-HHMMSS
+
+# Cleanup old backups
+./scripts/backup.sh --cleanup
+```
 
 **How to Test Phase 4E:**
-1. Run backup script manually: `./scripts/backup.sh`
-2. Verify backup files created in backup directory
-3. Delete test data from database
-4. Run restore script: `./scripts/restore.sh <backup-file>`
-5. Verify data restored correctly
+1. Run backup script: `./scripts/backup.sh`
+2. Verify backup files in `/opt/chitram-backups/`
+3. Run restore: `./scripts/restore.sh <timestamp>`
+4. Verify data restored correctly
 
 ---
 
 ### Phase 4F: Droplet Setup (Manual, One-time)
-**Priority: Required | Effort: 1 hour | Status: PENDING**
+**Priority: Required | Effort: 1 hour | Status: COMPLETE (Documentation Ready)**
 
 **Goal:** Provision and configure the production server
 
-**Tasks:**
-1. Create DigitalOcean droplet (Ubuntu 22.04, 2GB RAM)
-2. Install Docker and Docker Compose
-3. Configure firewall (ufw)
-4. Set up SSH key authentication
-5. Configure DNS (A record pointing to droplet IP)
-6. Create `.env.production` with real secrets
-7. Add GitHub Secrets for CD pipeline
+**Documentation Created:**
+- `docs/deployment/DROPLET_SETUP.md` - Complete step-by-step guide
 
 **Droplet Specs:**
 - **Size:** Basic, 2GB RAM, 2 vCPU, 50GB SSD ($18/month)
@@ -265,13 +266,21 @@ Push to main
 - **Image:** Ubuntu 22.04 LTS
 - **Authentication:** SSH keys only (no password)
 
+**Setup Steps (see DROPLET_SETUP.md for details):**
+1. Create DigitalOcean droplet
+2. Configure firewall (ufw: 22, 80, 443)
+3. Install Docker and Docker Compose
+4. Configure DNS (optional, for SSL)
+5. Deploy application
+6. Configure GitHub Secrets for CD
+7. Set up automated backups
+
 **How to Test Phase 4F:**
 1. SSH to droplet: `ssh root@<droplet-ip>`
 2. Verify Docker: `docker --version && docker compose version`
-3. Verify firewall: `sudo ufw status` (only 22, 80, 443 open)
-4. Manual deploy test: Copy files, run `docker compose up -d`
-5. Verify health: `curl http://<droplet-ip>:8000/health`
-6. Trigger CD pipeline from GitHub and verify deployment
+3. Verify firewall: `sudo ufw status`
+4. Verify health: `curl http://localhost:8000/health`
+5. Trigger CD pipeline from GitHub
 
 ---
 
@@ -331,8 +340,8 @@ chitram/
 2. [x] Phase 4B: Create CD pipeline
 3. [x] Phase 4C: Add Caddy for SSL (included in 4A)
 4. [ ] ~~Phase 4D: Set up monitoring~~ (DESCOPED for MVP)
-5. [ ] Phase 4E: Create backup scripts
-6. [ ] Phase 4F: Provision droplet (manual)
+5. [x] Phase 4E: Create backup scripts
+6. [x] Phase 4F: Droplet setup documentation
 7. [ ] First deployment!
 
 ---
