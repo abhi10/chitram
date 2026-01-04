@@ -109,6 +109,26 @@ class TestDownloadImage:
         assert response.headers["content-type"] == "image/jpeg"
         assert len(response.content) == len(sample_jpeg_bytes)
 
+    async def test_download_includes_filename_in_header(
+        self, client: AsyncClient, sample_jpeg_bytes: bytes
+    ):
+        """Content-Disposition header should include original filename with extension."""
+        # Upload with a specific filename
+        upload_response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("my_photo.jpg", sample_jpeg_bytes, "image/jpeg")},
+        )
+        image_id = upload_response.json()["id"]
+
+        # Download
+        response = await client.get(f"/api/v1/images/{image_id}/file")
+
+        assert response.status_code == 200
+        # Verify Content-Disposition includes the original filename
+        content_disposition = response.headers.get("content-disposition", "")
+        assert "my_photo.jpg" in content_disposition
+        assert "filename=" in content_disposition
+
     async def test_download_nonexistent_image(self, client: AsyncClient):
         """Downloading nonexistent image returns 404."""
         response = await client.get("/api/v1/images/nonexistent-id/file")

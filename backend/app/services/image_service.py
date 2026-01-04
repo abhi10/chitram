@@ -4,6 +4,7 @@ import asyncio
 import io
 import logging
 import uuid
+from datetime import datetime
 from typing import TYPE_CHECKING
 
 from PIL import Image as PILImage
@@ -205,8 +206,8 @@ class ImageService:
         if use_cache and self.cache:
             cached = await self.cache.get_image_metadata(image_id)
             if cached:
-                # Reconstruct Image model from cached dict
-                return Image(**cached), "HIT"
+                # Reconstruct Image model from cached dict with proper type conversion
+                return self._dict_to_image(cached), "HIT"
 
             # Cache miss - fetch from DB
             result = await self.db.execute(select(Image).where(Image.id == image_id))
@@ -241,12 +242,27 @@ class ImageService:
             "created_at": image.created_at.isoformat() if image.created_at else None,
         }
 
-    async def get_file(self, image_id: str) -> tuple[bytes, str] | None:
+    @staticmethod
+    def _dict_to_image(data: dict) -> Image:
+        """
+        Convert cached dict back to Image model.
+
+        Handles type conversions (e.g., ISO string -> datetime) that are
+        lost during JSON serialization in cache.
+        """
+        # Convert created_at from ISO string back to datetime
+        created_at = data.get("created_at")
+        if created_at and isinstance(created_at, str):
+            data["created_at"] = datetime.fromisoformat(created_at)
+
+        return Image(**data)
+
+    async def get_file(self, image_id: str) -> tuple[bytes, str, str] | None:
         """
         Get image file content.
 
         Returns:
-            Tuple of (file_bytes, content_type) or None if not found
+            Tuple of (file_bytes, content_type, filename) or None if not found
         """
         image = await self.get_by_id(image_id)
         if not image:
@@ -254,7 +270,7 @@ class ImageService:
 
         try:
             data = await self.storage.get(image.storage_key)
-            return data, image.content_type
+            return data, image.content_type, image.filename
         except FileNotFoundError:
             return None
 

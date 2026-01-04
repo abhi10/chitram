@@ -3,6 +3,7 @@
 import asyncio
 import io
 import logging
+from typing import TYPE_CHECKING
 
 from PIL import Image as PILImage
 from sqlalchemy import select, update
@@ -10,6 +11,9 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.models.image import Image
 from app.services.storage_service import StorageService
+
+if TYPE_CHECKING:
+    from app.services.cache_service import CacheService
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +30,7 @@ class ThumbnailService:
         self,
         storage: StorageService,
         session_factory: async_sessionmaker[AsyncSession],
+        cache: "CacheService | None" = None,
     ):
         """
         Initialize thumbnail service.
@@ -33,9 +38,11 @@ class ThumbnailService:
         Args:
             storage: Storage service for saving thumbnails
             session_factory: Async session factory for database operations
+            cache: Optional cache service for invalidation after thumbnail generation
         """
         self.storage = storage
         self.session_factory = session_factory
+        self.cache = cache
 
     @staticmethod
     def _generate_thumbnail_sync(
@@ -155,6 +162,10 @@ class ThumbnailService:
                     update(Image).where(Image.id == image_id).values(thumbnail_key=thumbnail_key)
                 )
                 await db.commit()
+
+                # Invalidate cache so next fetch gets updated thumbnail_key
+                if self.cache:
+                    await self.cache.invalidate_image(image_id)
 
                 logger.info(f"Thumbnail generated for image {image_id}: {thumbnail_key}")
                 return True

@@ -126,6 +126,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     thumbnail_service = ThumbnailService(
         storage=app.state.storage,
         session_factory=async_session_maker,
+        cache=cache_service,
     )
     app.state.thumbnail_service = thumbnail_service
     print("✅ Thumbnail service initialized")
