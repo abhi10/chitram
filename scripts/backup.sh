@@ -127,7 +127,7 @@ backup_database() {
     cd "$DEPLOY_DIR"
 
     # Check if postgres container is running
-    if ! docker compose -f "$COMPOSE_FILE" ps postgres | grep -q "running"; then
+    if ! docker compose -f "$COMPOSE_FILE" ps postgres | grep -qE "(running|Up)"; then
         print_error "PostgreSQL container is not running"
         return 1
     fi
@@ -160,7 +160,7 @@ backup_minio() {
     cd "$DEPLOY_DIR"
 
     # Check if minio container is running
-    if ! docker compose -f "$COMPOSE_FILE" ps minio | grep -q "running"; then
+    if ! docker compose -f "$COMPOSE_FILE" ps minio | grep -qE "(running|Up)"; then
         print_error "MinIO container is not running"
         return 1
     fi

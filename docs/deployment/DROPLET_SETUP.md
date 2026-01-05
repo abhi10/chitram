@@ -2,6 +2,14 @@
 
 Step-by-step guide to provision and configure a DigitalOcean droplet for Chitram.
 
+## Production Droplet
+
+| Property | Value |
+|----------|-------|
+| **IP Address** | `157.230.139.161` |
+| **Hostname** | `chitram-prod` |
+| **SSH** | `ssh root@157.230.139.161` |
+
 ## Prerequisites
 
 - DigitalOcean account
@@ -108,15 +116,17 @@ To                         Action      From
 
 ## Step 3: Install Docker
 
+Run as root (or use `sudo` prefix for each command):
+
 ```bash
 # Install dependencies
 apt install -y apt-transport-https ca-certificates curl software-properties-common
 
-# Add Docker's GPG key
-curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+# Add Docker's GPG key (note: sudo before gpg, not before curl)
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
 
 # Add Docker repository
-echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | tee /etc/apt/sources.list.d/docker.list > /dev/null
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
 
 # Install Docker
 apt update
@@ -129,6 +139,8 @@ docker compose version
 # Add user to docker group (if using non-root user)
 usermod -aG docker chitram
 ```
+
+> **Note:** After `usermod -aG docker chitram`, log out and back in for the group to take effect.
 
 ## Step 4: Configure DNS (Optional, for SSL)
 
@@ -151,14 +163,50 @@ If you have a domain:
 
 ### 5.1 Clone Repository
 
+For **public repositories**:
 ```bash
 # Create application directory
-mkdir -p /opt/chitram
+sudo mkdir -p /opt/chitram
+sudo chown chitram:chitram /opt/chitram
 cd /opt/chitram
 
 # Clone repository
 git clone https://github.com/abhi10/chitram.git .
 ```
+
+For **private repositories**, use a Deploy Key:
+
+```bash
+# 1. Generate deploy key (as the chitram user)
+ssh-keygen -t ed25519 -C "chitram-prod-deploy" -f ~/.ssh/github_deploy -N ""
+
+# 2. Fix permissions
+chmod 600 ~/.ssh/github_deploy
+chmod 644 ~/.ssh/github_deploy.pub
+
+# 3. Show the public key
+cat ~/.ssh/github_deploy.pub
+
+# 4. Add to GitHub:
+#    - Go to: https://github.com/abhi10/chitram/settings/keys
+#    - Click "Add deploy key"
+#    - Paste the public key, give it a name
+#    - Click "Add key" (read-only is fine)
+
+# 5. Create application directory
+sudo mkdir -p /opt/chitram
+sudo chown chitram:chitram /opt/chitram
+cd /opt/chitram
+
+# 6. Clone with deploy key
+GIT_SSH_COMMAND="ssh -i ~/.ssh/github_deploy" git clone git@github.com:abhi10/chitram.git .
+```
+
+> **Troubleshooting:** If you get "Permission denied" on the key file, ensure the key is owned by the correct user:
+> ```bash
+> sudo chown chitram:chitram ~/.ssh/github_deploy ~/.ssh/github_deploy.pub
+> chmod 600 ~/.ssh/github_deploy
+> ```
 
 ### 5.2 Create Production Environment
 
@@ -183,11 +231,14 @@ nano .env.production
 ```
 
 **Important settings to update:**
-- `DOMAIN`: Your domain (e.g., `images.example.com`) or `localhost`
-- `POSTGRES_PASSWORD`: Generated password
+- `DOMAIN`: Your domain (e.g., `images.example.com`) or `localhost` (if no domain)
+- `POSTGRES_PASSWORD`: Generated password (update in TWO places: the variable AND in `DATABASE_URL`)
 - `JWT_SECRET_KEY`: Generated secret
 - `MINIO_ROOT_PASSWORD`: Generated password
-- `MINIO_SECRET_KEY`: Generated secret
+- `MINIO_SECRET_KEY`: Generated secret (update in TWO places if `MINIO_ACCESS_KEY` uses same value)
+- `REDIS_PASSWORD`: Generated password
+
+> **Important:** The `DATABASE_URL` must use the same password as `POSTGRES_PASSWORD`. Update both!
 
 ### 5.3 Start Services
 
