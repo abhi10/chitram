@@ -166,17 +166,13 @@
                 >
                     Cancel
                 </button>
-                <form action="/api/v1/images/{{ image.id }}" method="POST" class="flex-1">
-                    <input type="hidden" name="_method" value="DELETE">
-                    <button
-                        type="submit"
-                        hx-delete="/api/v1/images/{{ image.id }}"
-                        hx-confirm="false"
-                        class="w-full bg-red-500 hover:bg-red-600 py-2 px-4 rounded-lg font-medium transition-colors"
-                    >
-                        Delete
-                    </button>
-                </form>
+                <button
+                    id="delete-confirm-btn"
+                    onclick="deleteImage()"
+                    class="flex-1 bg-red-500 hover:bg-red-600 py-2 px-4 rounded-lg font-medium transition-colors"
+                >
+                    Delete
+                </button>
             </div>
         </div>
     </div>
@@ -199,6 +195,46 @@
 
         function closeModal() {
             document.getElementById('delete-modal').classList.add('hidden');
+        }
+
+        async function deleteImage() {
+            const btn = document.getElementById('delete-confirm-btn');
+            btn.disabled = true;
+            btn.textContent = 'Deleting...';
+
+            try {
+                // Get auth token from cookie
+                const authToken = document.cookie
+                    .split('; ')
+                    .find(row => row.startsWith('chitram_auth='))
+                    ?.split('=')[1];
+
+                const headers = {};
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch('/api/v1/images/{{ image.id }}', {
+                    method: 'DELETE',
+                    headers: headers,
+                });
+
+                if (response.ok || response.status === 204) {
+                    // Redirect to home after successful deletion
+                    window.location.href = '/';
+                } else {
+                    const data = await response.json();
+                    alert(data.detail?.message || 'Failed to delete image');
+                    closeModal();
+                    btn.disabled = false;
+                    btn.textContent = 'Delete';
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+                closeModal();
+                btn.disabled = false;
+                btn.textContent = 'Delete';
+            }
         }
 
         // Close modal on escape

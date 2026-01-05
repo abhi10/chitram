@@ -209,8 +209,20 @@
         document.getElementById('submit-spinner').classList.remove('hidden');
 
         try {
+            // Get auth token from cookie
+            const authToken = document.cookie
+                .split('; ')
+                .find(row => row.startsWith('chitram_auth='))
+                ?.split('=')[1];
+
+            const headers = {};
+            if (authToken) {
+                headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
             const response = await fetch('/api/v1/images/upload', {
                 method: 'POST',
+                headers: headers,
                 body: formData,
             });
 
