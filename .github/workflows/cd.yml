@@ -124,9 +124,28 @@ jobs:
 
       - name: Verify image runs
         run: |
-          # Start the image with minimal config to verify it starts
+          # Start PostgreSQL for testing (production uses PostgreSQL, not SQLite)
+          docker run -d --name test-postgres \
+            -e POSTGRES_USER=test \
+            -e POSTGRES_PASSWORD=test \
+            -e POSTGRES_DB=test \
+            -p 5432:5432 \
+            postgres:16-alpine
+
+          # Wait for PostgreSQL to be ready
+          for i in {1..30}; do
+            if docker exec test-postgres pg_isready -U test; then
+              echo "PostgreSQL is ready"
+              break
+            fi
+            echo "Waiting for PostgreSQL... ($i/30)"
+            sleep 2
+          done
+
+          # Start the app with PostgreSQL
           docker run -d --name test-app \
-            -e DATABASE_URL=sqlite+aiosqlite:///test.db \
+            --link test-postgres:postgres \
+            -e DATABASE_URL=postgresql+asyncpg://test:test@postgres:5432/test \
             -e STORAGE_BACKEND=local \
             -e LOCAL_STORAGE_PATH=/tmp/uploads \
             -e JWT_SECRET_KEY=test-secret-key \
@@ -134,7 +153,7 @@ jobs:
             chitram:latest
 
           # Wait for startup
-          sleep 10
+          sleep 15
 
           # Check if container is still running
           if docker ps | grep -q test-app; then
@@ -143,10 +162,12 @@ jobs:
           else
             echo "Container failed to start"
             docker logs test-app
+            docker stop test-postgres || true
             exit 1
           fi
 
           docker stop test-app
+          docker stop test-postgres
 
   # ============================================
   # Step 3: Deploy to production server
@@ -218,10 +239,10 @@ jobs:
             sudo docker compose --env-file .env.production build
             sudo docker compose --env-file .env.production up -d
 
-            # Wait for health check
+            # Wait for health check (port 80 via Caddy, not 8000)
             echo "Waiting for health check..."
             for i in {1..30}; do
-              if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+              if curl -sf http://localhost/health > /dev/null 2>&1; then
                 echo "Health check passed!"
                 break
               fi
@@ -230,7 +251,7 @@ jobs:
             done
 
             # Verify deployment
-            if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+            if curl -sf http://localhost/health > /dev/null 2>&1; then
               echo "=== Deployment successful ==="
               # Clean up old backups (keep last 3)
               ls -dt /opt/chitram-backup-* 2>/dev/null | tail -n +4 | xargs -r sudo rm -rf
@@ -253,9 +274,9 @@ jobs:
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
           script: |
-            # Final health verification
+            # Final health verification (port 80 via Caddy)
             echo "=== Production Health Check ==="
-            curl -s http://localhost:8000/health | jq . || curl -s http://localhost:8000/health
+            curl -s http://localhost/health | jq . || curl -s http://localhost/health
 
             # Show running containers
             echo ""
