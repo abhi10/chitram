@@ -123,7 +123,9 @@ async def upload_page(
     request: Request,
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Upload page - Form to upload a new image."""
+    """Upload page - Form to upload a new image. Requires authentication."""
+    if not user:
+        return RedirectResponse(url="/login?next=/upload", status_code=302)
     templates = get_templates(request)
     return templates.TemplateResponse(
         request=request,

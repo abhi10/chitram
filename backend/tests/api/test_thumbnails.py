@@ -9,12 +9,13 @@ class TestUploadWithThumbnail:
 
     @pytest.mark.asyncio
     async def test_upload_response_includes_thumbnail_ready_false(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Upload response should include thumbnail_ready=False."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
 
         assert response.status_code == 201
@@ -24,12 +25,13 @@ class TestUploadWithThumbnail:
 
     @pytest.mark.asyncio
     async def test_upload_response_includes_thumbnail_url_none(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Upload response should include thumbnail_url=None initially."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
 
         assert response.status_code == 201
@@ -43,13 +45,14 @@ class TestGetMetadataWithThumbnail:
 
     @pytest.mark.asyncio
     async def test_metadata_includes_thumbnail_ready(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Metadata response should include thumbnail_ready field."""
         # Upload an image first
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -64,13 +67,14 @@ class TestGetMetadataWithThumbnail:
 
     @pytest.mark.asyncio
     async def test_metadata_includes_thumbnail_url(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Metadata response should include thumbnail_url field."""
         # Upload an image first
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -96,13 +100,14 @@ class TestThumbnailEndpoint:
 
     @pytest.mark.asyncio
     async def test_thumbnail_endpoint_for_new_image(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """After upload, thumbnail should be accessible (background task runs in test)."""
         # Upload an image
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -146,7 +151,9 @@ class TestThumbnailEndpointWithReadyThumbnail:
     """Test thumbnail endpoint when thumbnail is available."""
 
     @pytest.mark.asyncio
-    async def test_thumbnail_returns_jpeg(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+    async def test_thumbnail_returns_jpeg(
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
+    ):
         """When thumbnail is ready, should return JPEG image."""
         # This test requires manually triggering thumbnail generation
         # since background tasks don't run synchronously in tests
@@ -155,6 +162,7 @@ class TestThumbnailEndpointWithReadyThumbnail:
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -173,13 +181,14 @@ class TestThumbnailEndpointWithReadyThumbnail:
 
     @pytest.mark.asyncio
     async def test_thumbnail_is_smaller_than_original(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Thumbnail should be smaller than original image."""
         # Upload an image
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -198,13 +207,14 @@ class TestThumbnailEndpointWithReadyThumbnail:
 
     @pytest.mark.asyncio
     async def test_thumbnail_has_content_disposition(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Thumbnail response should have Content-Disposition header."""
         # Upload an image
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -227,13 +237,14 @@ class TestMetadataAfterThumbnailGenerated:
 
     @pytest.mark.asyncio
     async def test_metadata_shows_thumbnail_ready_true(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Metadata should show thumbnail_ready=True after generation."""
         # Upload an image
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
@@ -252,13 +263,14 @@ class TestMetadataAfterThumbnailGenerated:
 
     @pytest.mark.asyncio
     async def test_metadata_shows_thumbnail_url(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
         """Metadata should include thumbnail_url after generation."""
         # Upload an image
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 

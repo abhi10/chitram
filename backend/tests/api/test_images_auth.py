@@ -8,130 +8,53 @@ class TestUploadWithAuth:
     """Test image upload with authentication."""
 
     @pytest.mark.asyncio
-    async def test_anonymous_upload_returns_delete_token(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
-    ):
-        """Anonymous upload should return a delete token."""
+    async def test_anonymous_upload_rejected(self, client: AsyncClient, sample_jpeg_bytes: bytes):
+        """Anonymous upload should return 401 Unauthorized."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
         )
 
-        assert response.status_code == 201
-        data = response.json()
-        assert "delete_token" in data
-        assert data["delete_token"] is not None
-        assert len(data["delete_token"]) >= 40  # 32-byte base64
+        assert response.status_code == 401
+        assert response.json()["detail"]["code"] == "UNAUTHORIZED"
 
     @pytest.mark.asyncio
-    async def test_authenticated_upload_no_delete_token(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+    async def test_authenticated_upload_succeeds(
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
-        """Authenticated upload should not return a delete token."""
-        # Register and get token
-        register_response = await client.post(
-            "/api/v1/auth/register",
-            json={"email": "uploader@example.com", "password": "password123"},
-        )
-        token = register_response.json()["access_token"]
-
-        # Upload with auth
+        """Authenticated upload should succeed."""
         response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=auth_headers,
         )
 
         assert response.status_code == 201
         data = response.json()
-        assert data["delete_token"] is None
+        assert "id" in data
+        assert data["delete_token"] is None  # Authenticated users don't get delete tokens
 
 
 class TestDeleteWithAuth:
     """Test image deletion with authentication."""
 
     @pytest.mark.asyncio
-    async def test_anonymous_delete_with_valid_token(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
+    async def test_owner_can_delete_own_image(
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
     ):
-        """Anonymous upload can be deleted with correct token."""
-        # Upload anonymously
-        upload_response = await client.post(
-            "/api/v1/images/upload",
-            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
-        )
-        image_id = upload_response.json()["id"]
-        delete_token = upload_response.json()["delete_token"]
-
-        # Delete with token
-        response = await client.delete(
-            f"/api/v1/images/{image_id}",
-            params={"delete_token": delete_token},
-        )
-
-        assert response.status_code == 204
-
-    @pytest.mark.asyncio
-    async def test_anonymous_delete_without_token_fails(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
-    ):
-        """Anonymous upload deletion without token fails."""
-        # Upload anonymously
-        upload_response = await client.post(
-            "/api/v1/images/upload",
-            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
-        )
-        image_id = upload_response.json()["id"]
-
-        # Try to delete without token
-        response = await client.delete(f"/api/v1/images/{image_id}")
-
-        assert response.status_code == 403
-        assert response.json()["detail"]["code"] == "DELETE_TOKEN_REQUIRED"
-
-    @pytest.mark.asyncio
-    async def test_anonymous_delete_with_wrong_token_fails(
-        self, client: AsyncClient, sample_jpeg_bytes: bytes
-    ):
-        """Anonymous upload deletion with wrong token fails."""
-        # Upload anonymously
-        upload_response = await client.post(
-            "/api/v1/images/upload",
-            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
-        )
-        image_id = upload_response.json()["id"]
-
-        # Try to delete with wrong token
-        response = await client.delete(
-            f"/api/v1/images/{image_id}",
-            params={"delete_token": "wrong_token_here"},
-        )
-
-        assert response.status_code == 403
-        assert response.json()["detail"]["code"] == "INVALID_DELETE_TOKEN"
-
-    @pytest.mark.asyncio
-    async def test_owner_can_delete_own_image(self, client: AsyncClient, sample_jpeg_bytes: bytes):
         """Authenticated user can delete their own image."""
-        # Register and get token
-        register_response = await client.post(
-            "/api/v1/auth/register",
-            json={"email": "owner@example.com", "password": "password123"},
-        )
-        token = register_response.json()["access_token"]
-
         # Upload with auth
         upload_response = await client.post(
             "/api/v1/images/upload",
             files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
-            headers={"Authorization": f"Bearer {token}"},
+            headers=auth_headers,
         )
         image_id = upload_response.json()["id"]
 
         # Delete own image
         response = await client.delete(
             f"/api/v1/images/{image_id}",
-            headers={"Authorization": f"Bearer {token}"},
+            headers=auth_headers,
         )
 
         assert response.status_code == 204
@@ -172,11 +95,30 @@ class TestDeleteWithAuth:
         assert response.json()["detail"]["code"] == "FORBIDDEN"
 
     @pytest.mark.asyncio
-    async def test_delete_nonexistent_image(self, client: AsyncClient):
+    async def test_unauthenticated_delete_rejected(
+        self, client: AsyncClient, sample_jpeg_bytes: bytes, auth_headers: dict
+    ):
+        """Unauthenticated user cannot delete images."""
+        # Upload with auth
+        upload_response = await client.post(
+            "/api/v1/images/upload",
+            files={"file": ("test.jpg", sample_jpeg_bytes, "image/jpeg")},
+            headers=auth_headers,
+        )
+        image_id = upload_response.json()["id"]
+
+        # Try to delete without auth
+        response = await client.delete(f"/api/v1/images/{image_id}")
+
+        # Should get 403 (no delete token and not authenticated)
+        assert response.status_code == 403
+
+    @pytest.mark.asyncio
+    async def test_delete_nonexistent_image(self, client: AsyncClient, auth_headers: dict):
         """Deleting nonexistent image returns 404."""
         response = await client.delete(
             "/api/v1/images/nonexistent-id",
-            params={"delete_token": "any_token"},
+            headers=auth_headers,
         )
 
         assert response.status_code == 404

@@ -22,6 +22,8 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 
 from app.database import Base, get_db
 from app.main import app
+from app.models.user import User
+from app.services.auth_service import AuthService
 from app.services.cache_service import CacheService, set_cache
 from app.services.concurrency import UploadSemaphore, set_upload_semaphore
 from app.services.rate_limiter import RateLimiter, set_rate_limiter
@@ -229,3 +231,25 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     set_cache(None)
     set_rate_limiter(None)
     set_upload_semaphore(None)
+
+
+@pytest.fixture
+async def test_user(test_deps: TestDependencies) -> User:
+    """Create a test user for authenticated requests."""
+    auth_service = AuthService(test_deps.session)
+    user = await auth_service.create_user("test@example.com", "testpassword123")
+    await test_deps.session.commit()
+    return user
+
+
+@pytest.fixture
+async def auth_token(test_deps: TestDependencies, test_user: User) -> str:
+    """Generate auth token for test user."""
+    auth_service = AuthService(test_deps.session)
+    return auth_service.create_access_token(test_user.id)
+
+
+@pytest.fixture
+async def auth_headers(auth_token: str) -> dict[str, str]:
+    """Return authorization headers for authenticated requests."""
+    return {"Authorization": f"Bearer {auth_token}"}
