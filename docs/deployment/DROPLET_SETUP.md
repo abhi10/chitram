@@ -360,6 +360,44 @@ docker compose logs caddy
 # - Rate limited: Wait 1 hour (Let's Encrypt limit)
 ```
 
+### Using IP Address Without Domain (No HTTPS)
+
+The default Caddyfile is designed for domains with automatic HTTPS. If accessing via IP address only, you'll get redirects to `https://localhost/` which fails.
+
+**Solution:** Create an HTTP-only Caddyfile on the droplet:
+
+```bash
+cd /opt/chitram/deploy
+
+# Backup original
+sudo cp Caddyfile Caddyfile.domain
+
+# Create HTTP-only version for IP access
+sudo tee Caddyfile << 'EOF'
+:80 {
+    reverse_proxy app:8000
+    encode gzip zstd
+    header {
+        X-Frame-Options "SAMEORIGIN"
+        X-Content-Type-Options "nosniff"
+        X-XSS-Protection "1; mode=block"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        -Server
+    }
+    log {
+        output stdout
+        format json
+        level INFO
+    }
+}
+EOF
+
+# Restart Caddy
+sudo docker compose --env-file .env.production restart caddy
+```
+
+**Browser Caching Issue:** If you previously accessed the IP and got redirected to HTTPS, your browser may have cached this redirect (HSTS). Use an incognito/private window or clear browser cache to access `http://<droplet-ip>`.
+
 ### Can't SSH to Server
 
 ```bash
