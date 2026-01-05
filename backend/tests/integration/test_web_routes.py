@@ -36,24 +36,6 @@ class TestPublicPages:
         assert "masonry-grid" in response.text or "gallery" in response.text.lower()
 
     @pytest.mark.asyncio
-    async def test_upload_page_returns_200(self, client: AsyncClient):
-        """Upload page should be accessible to anyone."""
-        response = await client.get("/upload")
-
-        assert response.status_code == 200
-        assert "text/html" in response.headers["content-type"]
-        assert "upload" in response.text.lower()
-
-    @pytest.mark.asyncio
-    async def test_upload_page_has_form(self, client: AsyncClient):
-        """Upload page should contain upload form."""
-        response = await client.get("/upload")
-
-        assert response.status_code == 200
-        assert "form" in response.text.lower()
-        assert "drop" in response.text.lower()  # Drag-and-drop area
-
-    @pytest.mark.asyncio
     async def test_login_page_returns_200(self, client: AsyncClient):
         """Login page should be accessible."""
         response = await client.get("/login")
@@ -110,6 +92,46 @@ class TestImageDetailPage:
 
 class TestAuthProtectedPages:
     """Tests for pages requiring authentication."""
+
+    @pytest.mark.asyncio
+    async def test_upload_page_redirects_when_not_authenticated(self, client: AsyncClient):
+        """Upload page should redirect to login when not authenticated."""
+        response = await client.get("/upload", follow_redirects=False)
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/login?next=/upload"
+
+    @pytest.mark.asyncio
+    async def test_upload_page_returns_200_when_authenticated(self, client: AsyncClient, test_deps):
+        """Upload page should return 200 for authenticated users."""
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("uploader@example.com", "password123")
+        token = auth_service.create_access_token(user.id)
+
+        response = await client.get(
+            "/upload",
+            cookies={AUTH_COOKIE_NAME: token},
+        )
+
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "upload" in response.text.lower()
+
+    @pytest.mark.asyncio
+    async def test_upload_page_has_form_when_authenticated(self, client: AsyncClient, test_deps):
+        """Upload page should contain upload form for authenticated users."""
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("formtest@example.com", "password123")
+        token = auth_service.create_access_token(user.id)
+
+        response = await client.get(
+            "/upload",
+            cookies={AUTH_COOKIE_NAME: token},
+        )
+
+        assert response.status_code == 200
+        assert "form" in response.text.lower()
+        assert "drop" in response.text.lower()  # Drag-and-drop area
 
     @pytest.mark.asyncio
     async def test_my_images_redirects_when_not_authenticated(self, client: AsyncClient):

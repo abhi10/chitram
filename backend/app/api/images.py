@@ -16,7 +16,7 @@ from fastapi import (
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import get_current_user
+from app.api.auth import get_current_user, require_current_user
 from app.api.dependencies import get_cache, get_rate_limiter, get_upload_semaphore
 from app.config import get_settings
 from app.database import get_db
@@ -111,16 +111,16 @@ async def upload_image(
     service: ImageService = Depends(get_image_service),
     thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
-    current_user: User | None = Depends(get_current_user),
+    current_user: User = Depends(require_current_user),
 ) -> ImageUploadResponse:
     """
-    Upload a new image.
+    Upload a new image. Requires authentication.
 
     Accepts JPEG and PNG files up to 5MB.
+    Returns 401 if not authenticated.
     Returns 503 if server is too busy (concurrency limit reached).
 
-    - Anonymous uploads receive a delete_token for later deletion.
-    - Authenticated uploads are linked to the user (no delete token needed).
+    - All uploads are linked to the authenticated user.
     - Thumbnail generation is queued as a background task (Phase 2B).
     """
     # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
