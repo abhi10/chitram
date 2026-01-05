@@ -188,7 +188,8 @@ jobs:
             backend/ \
             deploy/docker-compose.yml \
             deploy/docker-compose.local.yml \
-            deploy/Caddyfile
+            deploy/Caddyfile \
+            scripts/
 
       - name: Copy files to server
         uses: appleboy/scp-action@v0.1.7
