@@ -32,6 +32,21 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: app
+          POSTGRES_PASSWORD: localdev
+          POSTGRES_DB: imagehost
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -70,7 +85,7 @@ jobs:
         working-directory: backend
         run: |
           cat > .env << EOF
-          DATABASE_URL=sqlite+aiosqlite:///./test.db
+          DATABASE_URL=postgresql+asyncpg://app:localdev@localhost:5432/imagehost
           JWT_SECRET_KEY=test-secret-key-for-github-actions
           STORAGE_BACKEND=local
           LOCAL_STORAGE_PATH=./test_uploads

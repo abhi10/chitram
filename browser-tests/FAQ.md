@@ -6,6 +6,8 @@
 
 **Short answer:** Browser tests don't directly use the database, but they test against a **running backend server** that does.
 
+**Note:** As of 2026-01-06, browser tests use **PostgreSQL** (same as production) instead of SQLite, ensuring production parity and catching database-specific issues.
+
 ### The Architecture
 
 ```
@@ -60,40 +62,47 @@ def upgrade():
 
 | Environment | Database URL (Configured) | Driver (Used) | Purpose |
 |-------------|---------------------------|---------------|---------|
-| **Development** | `postgresql+asyncpg://...` | Async | Real PostgreSQL |
-| **Integration tests** | `sqlite+aiosqlite:///test.db` | Async | Test DB (in-memory) |
-| **Browser tests (.env)** | `sqlite+aiosqlite:///test.db` | Async (app) | FastAPI uses async |
-| **Browser tests (Alembic)** | Converted to `sqlite:///test.db` | Sync (migrations) | Alembic converts internally |
+| **Production** | `postgresql+asyncpg://...` | Async | Real PostgreSQL |
+| **Backend tests (CI)** | `postgresql+asyncpg://app:localdev@...` | Async | Test DB |
+| **Browser tests (CI)** | `postgresql+asyncpg://app:localdev@...` | Async (app) | Same as production |
+| **Browser tests (Alembic)** | Converted to `postgresql://...` | Sync (migrations) | Alembic converts internally |
+| **Development (optional)** | `sqlite+aiosqlite:///dev.db` | Async | Local development only |
 
 ### Why Two Drivers for Browser Tests?
 
 ```yaml
 # .github/workflows/ui-tests.yml
 
+# PostgreSQL service runs in background
+services:
+  postgres:
+    image: postgres:16
+
 # .env file contains ASYNC driver
-DATABASE_URL=sqlite+aiosqlite:///./test.db
+DATABASE_URL=postgresql+asyncpg://app:localdev@localhost:5432/imagehost
 
 # Step 1: Run migrations (Alembic converts to SYNC internally)
 - name: Run database migrations
   run: uv run alembic upgrade head
-  # Alembic strips +aiosqlite → sqlite:///./test.db
+  # Alembic strips +asyncpg → postgresql://...
 
 # Step 2: Start app (uses ASYNC driver from .env)
 - name: Start backend server
   run: uv run uvicorn app.main:app
-  # Uses sqlite+aiosqlite:///./test.db
+  # Uses postgresql+asyncpg://...
 ```
 
 **Why?**
 - Alembic runs **synchronously** → converts async URL to sync internally
 - FastAPI runs **asynchronously** → uses async driver from env
-- Both use the same file (`test.db`), different drivers
+- Both connect to same PostgreSQL database, different drivers
 
 **How Alembic Converts:**
 ```python
 # backend/alembic/env.py
-sync_database_url = settings.database_url.replace("+aiosqlite", "")
-# sqlite+aiosqlite:///./test.db → sqlite:///./test.db
+sync_database_url = settings.database_url.replace("+asyncpg", "").replace("+aiosqlite", "")
+# postgresql+asyncpg://... → postgresql://...
+# sqlite+aiosqlite://... → sqlite://...
 ```
 
 ---
@@ -144,20 +153,24 @@ Browser Test                Backend Server              Database
 ### Option 1: Real Database (Current Approach) ✅
 
 ```yaml
-- Run Alembic migrations  # Create real schema
-- Start FastAPI           # Real app with real DB
-- Run browser tests       # Test real behavior
+- Start PostgreSQL service  # Same DB as production
+- Run Alembic migrations    # Create real schema
+- Start FastAPI             # Real app with real DB
+- Run browser tests         # Test real behavior
 ```
 
 **Pros:**
 - ✅ Tests real application behavior
-- ✅ Catches database-related bugs
+- ✅ Catches database-related bugs (PostgreSQL-specific)
 - ✅ Tests migrations work correctly
 - ✅ Realistic data flow
+- ✅ **Production parity** - same DB as production (PostgreSQL)
+- ✅ Catches SQL dialect differences
+- ✅ Tests transaction isolation and concurrency behavior
 
 **Cons:**
-- ⚠️ Slightly slower setup (~2-3s for migrations)
-- ⚠️ Requires database configuration
+- ⚠️ Slightly slower setup (~5-10s for PostgreSQL + migrations)
+- ⚠️ Requires database service in CI
 
 ### Option 2: Mock Database (Alternative) ❌
 
