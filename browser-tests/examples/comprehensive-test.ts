@@ -109,9 +109,15 @@ async function main() {
       await browser.waitForSelector('footer', { timeout: 5000 })
     })
 
-    await runTest('UI Elements', 'Gallery grid exists on home', async () => {
+    await runTest('UI Elements', 'Home page shows correct state (gallery or empty)', async () => {
       await browser.navigate(BASE_URL)
-      await browser.waitForSelector('.masonry-grid', { timeout: 5000 })
+      // Page should show either gallery grid (with images) or empty state (no images)
+      const page = await browser.getPage()
+      const hasGallery = await page.locator('.masonry-grid').count() > 0
+      const hasEmptyState = await page.locator('text=No images yet').count() > 0
+      if (!hasGallery && !hasEmptyState) {
+        throw new Error('Home page shows neither gallery nor empty state')
+      }
     })
 
     await runTest('UI Elements', 'Upload link present in nav', async () => {
@@ -291,7 +297,8 @@ async function main() {
     await runTest('Performance', 'Home page loads within 3 seconds', async () => {
       const startTime = Date.now()
       await browser.navigate(BASE_URL)
-      await browser.waitForSelector('.masonry-grid', { timeout: 5000 })
+      // Wait for main heading (always present, regardless of data)
+      await browser.waitForSelector('h1', { timeout: 5000 })
       const loadTime = Date.now() - startTime
       if (loadTime > 3000) {
         throw new Error(`Page took ${loadTime}ms to load (threshold: 3000ms)`)
