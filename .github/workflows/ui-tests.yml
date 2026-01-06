@@ -82,8 +82,6 @@ jobs:
 
       - name: Run database migrations
         working-directory: backend
-        env:
-          DATABASE_URL: sqlite:///./test.db
         run: |
           uv run alembic upgrade head
 
