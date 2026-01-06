@@ -128,12 +128,105 @@ curl http://localhost:8000/health
 
 ---
 
+## Verification Checklist
+
+After installation, verify everything works with these 8 mandatory checks:
+
+### 1. ✅ Directory Structure
+
+```bash
+ls -la
+# Should see: src/, tools/, workflows/, examples/, package.json
+```
+
+### 2. ✅ Core Files Present
+
+```bash
+ls -la src/ tools/ examples/
+# Should see: browser.ts, gallery-test.ts, smoke-test.ts, etc.
+```
+
+### 3. ✅ Bun Runtime Installed
+
+```bash
+bun --version
+# Should output: 1.x.x or higher
+```
+
+### 4. ✅ Dependencies Installed
+
+```bash
+ls -la node_modules/playwright
+# Should exist with Playwright files
+```
+
+### 5. ✅ Playwright Browsers Installed
+
+```bash
+bunx playwright --version
+# Should output version number
+```
+
+### 6. ✅ TypeScript Import Works
+
+```bash
+bun run -e "import { PlaywrightBrowser } from './src/browser'; console.log('✅ Import successful')"
+# Should output: ✅ Import successful
+```
+
+### 7. ✅ App is Running
+
+```bash
+curl -s http://localhost:8000/health
+# Should return: {"status":"healthy"} or similar
+```
+
+### 8. ✅ CLI Tool Test
+
+```bash
+bun run tools/gallery-test.ts verify-home http://localhost:8000
+```
+
+**Expected output:**
+```
+🏠 Verifying Home Page...
+✅ Page loaded in XXXms
+✅ Navigation bar found
+✅ Gallery grid found
+🎉 Home page verification passed!
+```
+
+---
+
+## Quick Verification Script
+
+Run all checks automatically:
+
+```bash
+#!/bin/bash
+echo "1. Directory structure..." && [ -d "src" ] && [ -d "tools" ] && echo "✅ PASS" || echo "❌ FAIL"
+echo "2. Core files..." && [ -f "src/browser.ts" ] && echo "✅ PASS" || echo "❌ FAIL"
+echo "3. Bun runtime..." && bun --version > /dev/null 2>&1 && echo "✅ PASS" || echo "❌ FAIL"
+echo "4. Dependencies..." && [ -d "node_modules/playwright" ] && echo "✅ PASS" || echo "❌ FAIL"
+echo "5. Playwright browsers..." && bunx playwright --version > /dev/null 2>&1 && echo "✅ PASS" || echo "❌ FAIL"
+echo "6. TypeScript import..." && bun run -e "import { PlaywrightBrowser } from './src/browser'" > /dev/null 2>&1 && echo "✅ PASS" || echo "❌ FAIL"
+echo "7. App running..." && curl -s http://localhost:8000/health > /dev/null && echo "✅ PASS" || echo "❌ FAIL"
+echo "8. CLI tool test..." && bun run tools/gallery-test.ts verify-home http://localhost:8000 > /dev/null 2>&1 && echo "✅ PASS" || echo "❌ FAIL"
+```
+
+**All 8 checks must pass for installation to be considered complete.**
+
+---
+
 ## Next Steps
 
-- Read [README.md](./README.md) for full usage guide
-- See [VERIFY.md](./VERIFY.md) for complete verification checklist
-- Explore `examples/` directory for test examples
-- Check `workflows/` for pre-written test scenarios
+Once all checks pass:
+
+1. ✅ Run smoke tests: `bun run examples/smoke-test.ts`
+2. ✅ Run comprehensive tests: `bun run examples/comprehensive-test.ts`
+3. ✅ Generate screenshots: `bun run examples/screenshot-all.ts`
+4. ✅ Integrate with CI/CD (see [CI_CD_INTEGRATION.md](./CI_CD_INTEGRATION.md))
+5. ✅ Read [README.md](./README.md) for full usage guide
 
 ---
 
