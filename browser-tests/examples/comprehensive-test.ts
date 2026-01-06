@@ -112,9 +112,9 @@ async function main() {
     await runTest('UI Elements', 'Home page shows correct state (gallery or empty)', async () => {
       await browser.navigate(BASE_URL)
       // Page should show either gallery grid (with images) or empty state (no images)
-      const page = await browser.getPage()
-      const hasGallery = await page.locator('.masonry-grid').count() > 0
-      const hasEmptyState = await page.locator('text=No images yet').count() > 0
+      const html = await browser.getVisibleHtml()
+      const hasGallery = html.includes('masonry-grid')
+      const hasEmptyState = html.includes('No images yet')
       if (!hasGallery && !hasEmptyState) {
         throw new Error('Home page shows neither gallery nor empty state')
       }
