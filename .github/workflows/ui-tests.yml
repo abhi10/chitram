@@ -71,9 +71,13 @@ jobs:
         run: |
           cat > .env << EOF
           DATABASE_URL=sqlite+aiosqlite:///./test.db
-          SECRET_KEY=test-secret-key-for-github-actions
-          STORAGE_TYPE=local
+          JWT_SECRET_KEY=test-secret-key-for-github-actions
+          STORAGE_BACKEND=local
           LOCAL_STORAGE_PATH=./test_uploads
+          APP_ENV=test
+          DEBUG=false
+          CACHE_ENABLED=false
+          RATE_LIMIT_ENABLED=false
           EOF
 
       - name: Run database migrations
