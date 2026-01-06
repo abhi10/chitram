@@ -16,6 +16,65 @@ Your browser test suite is now integrated with GitHub Actions and provides:
 
 ---
 
+## 🚀 Quick Start
+
+### First-Time Setup
+
+Your workflows are already created in `.github/workflows/`:
+- ✅ `ui-tests.yml` - Main test workflow
+- ✅ `post-deployment-tests.yml` - Post-deployment verification
+
+**No additional setup needed!** Just push your code.
+
+### Common Tasks
+
+**Run tests on push** (automatic):
+```bash
+git add .
+git commit -m "feat: add new feature"
+git push  # Tests run automatically
+```
+
+**Run tests against custom URL** (manual):
+```bash
+# Via GitHub CLI
+gh workflow run ui-tests.yml -f test_url=https://staging.chitram.io
+
+# Via GitHub UI: Actions → UI Tests → Run workflow
+```
+
+**Check workflow status**:
+```bash
+gh run list --workflow=ui-tests.yml
+gh run watch  # Watch live run
+```
+
+**Download screenshots**:
+```bash
+gh run download <run-id>
+```
+
+### Quick Command Reference
+
+```bash
+# List workflows
+gh workflow list
+
+# Run UI tests
+gh workflow run ui-tests.yml
+
+# View recent runs
+gh run list --workflow=ui-tests.yml --limit 5
+
+# Cancel running workflow
+gh run cancel <run-id>
+
+# Re-run failed tests
+gh run rerun <run-id> --failed
+```
+
+---
+
 ## GitHub Actions Workflows
 
 ### 1. UI Tests (`ui-tests.yml`)

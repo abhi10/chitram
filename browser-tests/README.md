@@ -63,6 +63,43 @@ Tier 3: Comprehensive Tests (2% of use cases)
   └─ smoke-test.ts, comprehensive-test.ts
 ```
 
+### Testing Pyramid
+
+This browser test suite sits at the top of the testing pyramid:
+
+```
+                    ┌─────────────────┐
+                    │   E2E Tests     │ ← browser-tests/ (Few, Slow, High Value)
+                    │  (Playwright)   │   YOU ARE HERE
+                    └─────────────────┘
+                           ▲
+                           │ Tests via HTTP
+                           │
+                    ┌─────────────────┐
+                    │  Integration    │ ← backend/tests/integration/
+                    │    Tests        │
+                    └─────────────────┘
+                           ▲
+                           │ Tests with real DB
+                           │
+               ┌───────────────────────┐
+               │     API Tests         │ ← backend/tests/api/
+               └───────────────────────┘
+                           ▲
+                           │ Tests endpoints
+                           │
+       ┌───────────────────────────────────┐
+       │         Unit Tests                │ ← backend/tests/unit/
+       └───────────────────────────────────┘
+                    Tests functions
+```
+
+**Key Points:**
+- E2E tests (this suite): Few tests, validate critical user journeys
+- Integration tests: Test services with real dependencies
+- API tests: Test HTTP endpoints without browser
+- Unit tests: Fast, isolated function tests
+
 ### Directory Structure
 
 ```
