@@ -1,0 +1,131 @@
+name: Post-Deployment Tests
+
+# This workflow runs after successful deployments to verify the deployed app
+on:
+  # Trigger after deployment workflow completes
+  workflow_run:
+    workflows: ["Deploy to Production", "Deploy"]
+    types:
+      - completed
+
+  # Manual trigger with custom URL
+  workflow_dispatch:
+    inputs:
+      deployment_url:
+        description: 'Deployment URL to test'
+        required: true
+        default: 'https://chitram.io'
+      run_visual_regression:
+        description: 'Run visual regression tests'
+        type: boolean
+        default: false
+
+jobs:
+  post-deployment-smoke-test:
+    name: Post-Deployment Smoke Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only run if deployment was successful
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: browser-tests
+        run: |
+          bun install
+
+      - name: Install Playwright browsers
+        working-directory: browser-tests
+        run: |
+          bunx playwright install chromium --with-deps
+
+      - name: Determine deployment URL
+        id: deployment-url
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "url=${{ github.event.inputs.deployment_url }}" >> $GITHUB_OUTPUT
+          else
+            echo "url=https://chitram.io" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Wait for deployment to be ready
+        run: |
+          echo "Waiting for deployment at ${{ steps.deployment-url.outputs.url }} to be ready..."
+          for i in {1..30}; do
+            if curl -f -s ${{ steps.deployment-url.outputs.url }}/health > /dev/null 2>&1; then
+              echo "Deployment is ready!"
+              exit 0
+            fi
+            echo "Attempt $i/30: Deployment not ready yet, waiting 10 seconds..."
+            sleep 10
+          done
+          echo "Deployment failed to become ready after 5 minutes"
+          exit 1
+
+      - name: Run critical smoke tests
+        working-directory: browser-tests
+        run: |
+          echo "🔥 Running critical smoke tests against ${{ steps.deployment-url.outputs.url }}"
+          bun run examples/smoke-test.ts ${{ steps.deployment-url.outputs.url }}
+
+      - name: Run comprehensive tests
+        working-directory: browser-tests
+        run: |
+          echo "🧪 Running comprehensive tests against ${{ steps.deployment-url.outputs.url }}"
+          bun run examples/comprehensive-test.ts ${{ steps.deployment-url.outputs.url }}
+
+      - name: Upload test screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-deployment-screenshots-${{ github.run_number }}
+          path: browser-tests/screenshots/
+          retention-days: 30
+
+      - name: Create deployment verification summary
+        if: always()
+        run: |
+          echo "## 🚀 Deployment Verification Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment URL:** ${{ steps.deployment-url.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Deployment Time:** $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "### ✅ All tests passed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The deployment has been verified and is working correctly." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "### ❌ Tests failed!" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "The deployment may have issues. Please review the test results." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Run visual regression (if requested)
+        if: github.event.inputs.run_visual_regression == 'true'
+        working-directory: browser-tests
+        run: |
+          echo "📸 Generating visual regression baseline"
+          bun run examples/screenshot-all.ts ${{ steps.deployment-url.outputs.url }}
+
+      - name: Upload visual regression screenshots
+        if: github.event.inputs.run_visual_regression == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-regression-${{ github.run_number }}
+          path: browser-tests/screenshots/visual-regression/
+          retention-days: 90
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "::error::Post-deployment tests failed for ${{ steps.deployment-url.outputs.url }}"
+          echo "Please check the deployment and review test screenshots."
