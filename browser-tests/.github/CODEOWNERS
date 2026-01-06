@@ -1,0 +1,14 @@
+# Automatically request review from repo owner for all changes
+* @abhi10
+
+# Backend code
+/backend/ @abhi10
+
+# Browser tests
+/browser-tests/ @abhi10
+
+# GitHub workflows
+/.github/workflows/ @abhi10
+
+# Documentation
+/docs/ @abhi10
