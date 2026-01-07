@@ -8,10 +8,9 @@
 - pytest for testing
 
 ## Current Status
-- Phase 1 scaffolding complete (full-featured)
-- **Phase 1 Lean removals:** ✅ Complete (2025-12-19)
-- **Current Phase:** Phase 1 Lean (ready for validation)
-- Working on: Git initialization + Alembic setup
+- **Current Phase:** Phase 3 deployed to production (https://chitram.io)
+- **Tests:** 225 passing
+- **Production:** DigitalOcean droplet with Docker Compose, Caddy, PostgreSQL, MinIO, Redis
 
 ## Key Decisions
 - Using GitHub Codespaces for development (ADR-0007)
@@ -53,10 +52,59 @@ uv run pytest                     # All tests
 uv run pytest tests/api -v        # API tests only
 uv run pytest --cov=app           # With coverage
 
-# Code Quality
-uv run black .                    # Format
-uv run ruff check --fix .         # Lint
+# Code Quality (runs automatically on commit via pre-commit)
+uv run pre-commit run --all-files # Run all hooks manually
+uv run ruff check --fix .         # Lint only
 ```
+
+## Developer Workflow Tools
+
+### Pre-commit Hooks (Automatic)
+Runs automatically on every `git commit`. Catches issues before they reach CI.
+
+**Hooks enabled:**
+| Hook | Purpose |
+|------|---------|
+| `trailing-whitespace` | Clean up whitespace |
+| `ruff` | Linting with auto-fix |
+| `ruff-format` | Code formatting |
+| `no-commit-to-branch` | Blocks direct commits to main |
+| `detect-private-key` | Prevents credential leaks |
+| `hadolint` | Dockerfile linting |
+
+**Usage:**
+```bash
+# Runs automatically on commit
+git commit -m "feat: add feature"
+
+# Skip hooks (emergency only)
+git commit --no-verify -m "hotfix: urgent fix"
+
+# Run manually on all files
+uv run pre-commit run --all-files
+```
+
+### Debugging Agent (Manual)
+Self-contained context for debugging Chitram issues. Located at `.claude/agents/debugging.md`.
+
+**When to use:**
+- Stack traces or exceptions
+- Failing tests
+- Unexpected API responses (500s, wrong data)
+- Cache/Redis issues
+
+**How to invoke:**
+```
+"Use the debugging agent approach for this error: [paste stack trace]"
+"Debug why test_upload_image is failing"
+"Trace this 500 error from the logs"
+```
+
+**What it provides:**
+- Chitram-specific error patterns (401/403/404/429/500/503)
+- Diagnostic process (parse → trace → correlate → RCA)
+- File lookup table by issue type
+- Test isolation gotchas (BackgroundTasks, session_factory)
 
 ## API Endpoints
 - `POST /api/v1/images/upload` - Upload image (JPEG/PNG, max 5MB)
@@ -240,38 +288,24 @@ See `docs/code-review-checklist.md` for step-by-step walkthrough:
 
 ## Pending Work
 
-### Immediate (Phase 1 Lean)
-- [x] **Apply ADR-0008 removals** ✅ Complete - 126 lines removed, 3 deps removed
-  - ✅ Removed MinIO backend
-  - ✅ Removed Pillow dependency
-  - ✅ Simplified validation (no python-magic)
-  - ✅ Removed unused model fields
-- [ ] **Git initialization** - First commit with lean code
-- [ ] **Update tests** - Remove width/height assertions
-- [ ] **Alembic migrations setup** - Database schema versioning (7 columns)
-- [ ] **Install dependencies** - `uv sync`
-- [ ] **Validation** - Follow `docs/validation-checklist.md`
-- [ ] Push to GitHub and test Codespaces
+See `TODO.md` for detailed phase tracking.
 
-### Phase 1.5 (After Validation)
-- [ ] Add back Pillow for image dimensions
-- [ ] Alembic migration for width/height columns
+### Current Focus
+- Phase 3 deployed to production
+- Developer tooling: Pre-commit hooks, Debugging agent
 
-### Phase 2 (Future)
-- [ ] MinIO backend restoration
-- [ ] Redis caching layer
-- [ ] Rate limiting implementation
-- [ ] User authentication
-- [ ] Background jobs (thumbnails)
-- [ ] Delete tokens
+### Future Phases
+- **Phase 4:** Celery, Deduplication, Checksum
+- **Phase 5:** Horizontal Scaling (Nginx, DB replication, Redis cluster)
+- **Phase 6:** Observability (Prometheus, Grafana, Jaeger)
 
-## Session Notes
+## Developer Tooling
 
-### Alternative Ways to Preserve Context
-Beyond CLAUDE.md, consider:
-1. **ADRs** (`docs/adr/`) - For architectural decisions
-2. **Session logs** (`docs/sessions/YYYY-MM-DD.md`) - Detailed dev notes
-3. **Inline comments** - Document "why" not "what" in code
-4. **Git commits** - Detailed commit messages with context
-5. **README updates** - High-level changes
-6. **TODO comments** - Mark future work in code with context
+| Tool | Location | Purpose |
+|------|----------|---------|
+| Pre-commit hooks | `.pre-commit-config.yaml` | Auto-lint/format on commit |
+| Debugging agent | `.claude/agents/debugging.md` | Chitram-specific debugging context |
+| Python rules | `.claude/rules/python.md` | Coding guidelines |
+| Commit checklist | `.claude/rules/commit-checklist.md` | Pre-commit verification |
+| Ship skill | `.claude/commands/ship.md` | Full CI/CD workflow |
+| Validate skill | `.claude/commands/validate-deploy.md` | Deployment validation |
