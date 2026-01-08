@@ -85,7 +85,7 @@ async function main() {
 
     const registerSuccess = await runTest('Navigate to register page', async () => {
       await browser.navigate(`${BASE_URL}/register`)
-      await browser.waitForSelector('input[type="email"]', { timeout: 5000 })
+      await browser.waitForSelector('input#email', { timeout: 5000 })
       await browser.screenshot({ path: `${SCREENSHOTS_DIR}/01-register-page.png` })
     })
 
@@ -94,8 +94,8 @@ async function main() {
     }
 
     await runTest('Fill registration form', async () => {
-      await browser.type('input[type="email"]', TEST_EMAIL)
-      await browser.type('input[type="password"]', TEST_PASSWORD)
+      await browser.type('input#email', TEST_EMAIL)
+      await browser.type('input#password', TEST_PASSWORD)
       await browser.type('input#confirm-password', TEST_PASSWORD)
       await browser.screenshot({ path: `${SCREENSHOTS_DIR}/02-register-filled.png` })
     })
@@ -206,13 +206,13 @@ async function main() {
 
     await runTest('Navigate to login page', async () => {
       await browser.navigate(`${BASE_URL}/login`)
-      await browser.waitForSelector('input[type="email"]', { timeout: 5000 })
+      await browser.waitForSelector('input#email', { timeout: 5000 })
       await browser.screenshot({ path: `${SCREENSHOTS_DIR}/09-login-page.png` })
     })
 
     await runTest('Fill login form', async () => {
-      await browser.type('input[type="email"]', TEST_EMAIL)
-      await browser.type('input[type="password"]', TEST_PASSWORD)
+      await browser.type('input#email', TEST_EMAIL)
+      await browser.type('input#password', TEST_PASSWORD)
       await browser.screenshot({ path: `${SCREENSHOTS_DIR}/10-login-filled.png` })
     })
 
@@ -257,10 +257,10 @@ async function main() {
 
     await runTest('Invalid password shows error', async () => {
       await browser.navigate(`${BASE_URL}/login`)
-      await browser.waitForSelector('input[type="email"]', { timeout: 5000 })
+      await browser.waitForSelector('input#email', { timeout: 5000 })
 
-      await browser.type('input[type="email"]', TEST_EMAIL)
-      await browser.type('input[type="password"]', 'WrongPassword123!')
+      await browser.type('input#email', TEST_EMAIL)
+      await browser.type('input#password', 'WrongPassword123!')
       await browser.click('button[type="submit"]')
 
       await browser.wait(3000)
