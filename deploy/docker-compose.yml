@@ -64,6 +64,11 @@ services:
       JWT_SECRET_KEY: ${JWT_SECRET_KEY:-dev-secret-change-in-production}
       JWT_ACCESS_TOKEN_EXPIRE_MINUTES: ${JWT_ACCESS_TOKEN_EXPIRE_MINUTES:-1440}
 
+      # Auth Provider (Phase 3.5)
+      AUTH_PROVIDER: ${AUTH_PROVIDER:-local}
+      SUPABASE_URL: ${SUPABASE_URL:-}
+      SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
+
       # App Settings
       DEBUG: ${DEBUG:-false}
     depends_on:
