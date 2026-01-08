@@ -190,3 +190,41 @@ class TestTokenEndpoint:
         )
 
         assert response.status_code == 401
+
+
+class TestPasswordReset:
+    """Test password reset endpoint."""
+
+    @pytest.mark.asyncio
+    async def test_password_reset_returns_202(self, client: AsyncClient):
+        """Password reset request always returns 202 (prevents email enumeration)."""
+        response = await client.post(
+            "/api/v1/auth/password-reset",
+            json={"email": "test@example.com"},
+        )
+
+        assert response.status_code == 202
+        data = response.json()
+        assert "message" in data
+        assert "password reset" in data["message"].lower()
+
+    @pytest.mark.asyncio
+    async def test_password_reset_nonexistent_email(self, client: AsyncClient):
+        """Nonexistent email still returns 202 (security: no enumeration)."""
+        response = await client.post(
+            "/api/v1/auth/password-reset",
+            json={"email": "nonexistent@example.com"},
+        )
+
+        # Should return same response as existing email
+        assert response.status_code == 202
+
+    @pytest.mark.asyncio
+    async def test_password_reset_invalid_email(self, client: AsyncClient):
+        """Invalid email format returns 422."""
+        response = await client.post(
+            "/api/v1/auth/password-reset",
+            json={"email": "not-an-email"},
+        )
+
+        assert response.status_code == 422

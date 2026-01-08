@@ -66,6 +66,13 @@ class Settings(BaseSettings):
     jwt_algorithm: str = "HS256"
     jwt_expire_minutes: int = 1440  # 24 hours
 
+    # Auth Provider (Phase 3.5)
+    auth_provider: str = "local"  # "local" or "supabase"
+
+    # Supabase Configuration (only used when auth_provider = "supabase")
+    supabase_url: str | None = None
+    supabase_anon_key: str | None = None
+
     @property
     def max_file_size_bytes(self) -> int:
         """Max file size in bytes."""

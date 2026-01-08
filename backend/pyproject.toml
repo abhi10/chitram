@@ -31,7 +31,8 @@ dependencies = [
     "email-validator>=2.3.0",
     # Phase 3: Web UI
     "jinja2>=3.1.0",
-    "itsdangerous>=2.2.0",  # For CSRF tokens
+    "itsdangerous>=2.2.0", # For CSRF tokens
+    "supabase>=2.27.1",
 ]
 
 [project.optional-dependencies]

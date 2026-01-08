@@ -1,39 +1,58 @@
-"""Authentication API endpoints."""
+"""Authentication API endpoints.
+
+This module provides the auth API using the pluggable AuthProvider interface.
+The actual provider (local, supabase, etc.) is determined by configuration.
+"""
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
-from app.schemas.auth import AuthResponse, Token, UserLogin, UserRegister, UserResponse
+from app.schemas.auth import (
+    AuthResponse,
+    PasswordResetRequest,
+    PasswordResetResponse,
+    Token,
+    UserLogin,
+    UserRegister,
+    UserResponse,
+)
 from app.schemas.error import ErrorDetail
-from app.services.auth_service import AuthService
+from app.services.auth import AuthError, AuthProvider, create_auth_provider
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
 
 
-def get_auth_service(db: AsyncSession = Depends(get_db)) -> AuthService:
-    """Dependency to get auth service."""
-    return AuthService(db)
+def get_auth_provider(db: AsyncSession = Depends(get_db)) -> AuthProvider:
+    """Dependency to get auth provider based on configuration."""
+    settings = get_settings()
+    return create_auth_provider(db=db, settings=settings)
 
 
 async def get_current_user(
     token: str | None = Depends(oauth2_scheme),
-    auth_service: AuthService = Depends(get_auth_service),
+    provider: AuthProvider = Depends(get_auth_provider),
+    db: AsyncSession = Depends(get_db),
 ) -> User | None:
     """Get current user from JWT token. Returns None if not authenticated."""
     if token is None:
         return None
-    user_id = auth_service.verify_token(token)
-    if user_id is None:
+
+    result = await provider.verify_token(token)
+    if isinstance(result, AuthError):
         return None
-    user = await auth_service.get_user_by_id(user_id)
-    if user is None or not user.is_active:
-        return None
-    return user
+
+    # Get the actual User model from DB (for backward compatibility)
+    from sqlalchemy import select
+
+    stmt = select(User).where(User.id == result.local_user_id)
+    db_result = await db.execute(stmt)
+    return db_result.scalar_one_or_none()
 
 
 async def require_current_user(
@@ -55,72 +74,109 @@ async def require_current_user(
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
     data: UserRegister,
-    auth_service: AuthService = Depends(get_auth_service),
+    provider: AuthProvider = Depends(get_auth_provider),
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Register a new user account."""
-    existing = await auth_service.get_user_by_email(data.email)
-    if existing:
+    result = await provider.register(data.email, data.password)
+
+    if isinstance(result, AuthError):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
+            detail=result.to_dict(),
+        )
+
+    # Get token via login
+    login_result = await provider.login(data.email, data.password)
+    if isinstance(login_result, AuthError):
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorDetail(
-                code="EMAIL_EXISTS",
-                message="Email already registered",
+                code="REGISTRATION_ERROR",
+                message="Registration succeeded but login failed",
             ).model_dump(),
         )
 
-    user = await auth_service.create_user(data.email, data.password)
-    access_token = auth_service.create_access_token(user.id)
+    user_info, token_pair = login_result
+
+    # Get User model for response
+    from sqlalchemy import select
+
+    stmt = select(User).where(User.id == user_info.local_user_id)
+    db_result = await db.execute(stmt)
+    user = db_result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=ErrorDetail(
+                code="USER_NOT_FOUND",
+                message="User created but not found in database",
+            ).model_dump(),
+        )
 
     return AuthResponse(
         user=UserResponse.model_validate(user),
-        access_token=access_token,
+        access_token=token_pair.access_token,
     )
 
 
 @router.post("/login", response_model=AuthResponse)
 async def login(
     data: UserLogin,
-    auth_service: AuthService = Depends(get_auth_service),
+    provider: AuthProvider = Depends(get_auth_provider),
+    db: AsyncSession = Depends(get_db),
 ) -> AuthResponse:
     """Login with email and password."""
-    user = await auth_service.authenticate_user(data.email, data.password)
-    if user is None:
-        # Generic error to prevent user enumeration
+    result = await provider.login(data.email, data.password)
+
+    if isinstance(result, AuthError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=result.to_dict(),
+        )
+
+    user_info, token_pair = result
+
+    # Get User model for response
+    from sqlalchemy import select
+
+    stmt = select(User).where(User.id == user_info.local_user_id)
+    db_result = await db.execute(stmt)
+    user = db_result.scalar_one_or_none()
+
+    if user is None:
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=ErrorDetail(
-                code="INVALID_CREDENTIALS",
-                message="Invalid email or password",
+                code="USER_NOT_FOUND",
+                message="Login succeeded but user not found in database",
             ).model_dump(),
         )
 
-    access_token = auth_service.create_access_token(user.id)
-
     return AuthResponse(
         user=UserResponse.model_validate(user),
-        access_token=access_token,
+        access_token=token_pair.access_token,
     )
 
 
 @router.post("/token", response_model=Token)
 async def login_for_token(
     form_data: OAuth2PasswordRequestForm = Depends(),
-    auth_service: AuthService = Depends(get_auth_service),
+    provider: AuthProvider = Depends(get_auth_provider),
 ) -> Token:
     """OAuth2 compatible token endpoint for Swagger UI."""
-    user = await auth_service.authenticate_user(form_data.username, form_data.password)
-    if user is None:
+    result = await provider.login(form_data.username, form_data.password)
+
+    if isinstance(result, AuthError):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=ErrorDetail(
-                code="INVALID_CREDENTIALS",
-                message="Invalid email or password",
-            ).model_dump(),
+            detail=result.to_dict(),
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-    access_token = auth_service.create_access_token(user.id)
-    return Token(access_token=access_token)
+    _, token_pair = result
+    return Token(access_token=token_pair.access_token)
 
 
 @router.get("/me", response_model=UserResponse)
@@ -129,3 +185,20 @@ async def get_me(
 ) -> UserResponse:
     """Get current authenticated user profile."""
     return UserResponse.model_validate(user)
+
+
+@router.post(
+    "/password-reset",
+    response_model=PasswordResetResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def request_password_reset(
+    data: PasswordResetRequest,
+    provider: AuthProvider = Depends(get_auth_provider),
+) -> PasswordResetResponse:
+    """Request password reset email.
+
+    Always returns success to prevent email enumeration.
+    """
+    await provider.request_password_reset(data.email)
+    return PasswordResetResponse()
