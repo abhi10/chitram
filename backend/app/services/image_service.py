@@ -159,18 +159,24 @@ class ImageService:
         )
         return list(result.scalars().all())
 
-    async def list_by_user(self, user_id: str) -> list[Image]:
+    async def list_by_user(self, user_id: str, limit: int = 100, offset: int = 0) -> list[Image]:
         """
-        List all images uploaded by a specific user.
+        List images uploaded by a specific user with pagination.
 
         Args:
             user_id: User ID to filter by
+            limit: Maximum number of images to return (default 100)
+            offset: Number of images to skip (default 0)
 
         Returns:
             List of Image models ordered by creation date (newest first)
         """
         result = await self.db.execute(
-            select(Image).where(Image.user_id == user_id).order_by(desc(Image.created_at))
+            select(Image)
+            .where(Image.user_id == user_id)
+            .order_by(desc(Image.created_at))
+            .limit(limit)
+            .offset(offset)
         )
         return list(result.scalars().all())
 

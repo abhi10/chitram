@@ -16,24 +16,34 @@ from app.services.auth_service import AuthService
 
 
 class TestPublicPages:
-    """Tests for public pages accessible without authentication."""
+    """Tests for public pages accessible without authentication.
+
+    Note: Per FR-4.1, the home page now requires authentication.
+    Anonymous users are redirected to login.
+    """
 
     @pytest.mark.asyncio
-    async def test_home_page_returns_200(self, client: AsyncClient):
-        """Home page should return 200 and HTML content."""
-        response = await client.get("/")
+    async def test_home_page_redirects_anonymous_to_login(self, client: AsyncClient):
+        """Home page should redirect anonymous users to login (FR-4.1 unlisted model)."""
+        response = await client.get("/", follow_redirects=False)
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/login"
+
+    @pytest.mark.asyncio
+    async def test_home_page_returns_200_for_authenticated(self, client: AsyncClient, test_deps):
+        """Home page should return 200 for authenticated users."""
+        from app.services.auth_service import AuthService
+
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("homeuser@example.com", "password123")
+        token = auth_service.create_access_token(user.id)
+
+        response = await client.get("/", cookies={AUTH_COOKIE_NAME: token})
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "Chitram" in response.text  # Brand name in nav
-
-    @pytest.mark.asyncio
-    async def test_home_page_shows_gallery(self, client: AsyncClient):
-        """Home page should show gallery section."""
-        response = await client.get("/")
-
-        assert response.status_code == 200
-        assert "masonry-grid" in response.text or "gallery" in response.text.lower()
 
     @pytest.mark.asyncio
     async def test_login_page_returns_200(self, client: AsyncClient):
@@ -246,11 +256,11 @@ class TestHTMXPartials:
         assert "text/html" in response.headers["content-type"]
 
     @pytest.mark.asyncio
-    async def test_gallery_partial_shows_images(
+    async def test_gallery_partial_returns_empty_for_anonymous(
         self, client: AsyncClient, test_deps, sample_jpeg_bytes
     ):
-        """Gallery partial should include images in response."""
-        # Create some images
+        """Gallery partial should return empty for anonymous users (FR-4.1)."""
+        # Create some images (without user ownership for test setup)
         for i in range(3):
             image = Image(
                 filename=f"test{i}.jpg",
@@ -265,8 +275,52 @@ class TestHTMXPartials:
         response = await client.get("/partials/gallery")
 
         assert response.status_code == 200
-        # Should contain image elements or masonry items
-        assert "masonry-item" in response.text or "img" in response.text
+        # Anonymous users get empty response
+        assert "masonry-item" not in response.text
+        assert response.text.strip() == "" or "img" not in response.text
+
+    @pytest.mark.asyncio
+    async def test_gallery_partial_shows_only_users_images(
+        self, client: AsyncClient, test_deps, sample_jpeg_bytes
+    ):
+        """Gallery partial should only show authenticated user's images (FR-4.1)."""
+        # Create a user
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("gallery@example.com", "password123")
+        token = auth_service.create_access_token(user.id)
+
+        # Create images owned by this user
+        for i in range(2):
+            image = Image(
+                filename=f"myimage{i}.jpg",
+                content_type="image/jpeg",
+                file_size=len(sample_jpeg_bytes),
+                storage_key=f"my-key-{i}.jpg",
+                upload_ip="127.0.0.1",
+                user_id=user.id,
+            )
+            test_deps.session.add(image)
+
+        # Create image owned by another user (should NOT appear)
+        other_user = await auth_service.create_user("other@example.com", "password123")
+        other_image = Image(
+            filename="otherimage.jpg",
+            content_type="image/jpeg",
+            file_size=len(sample_jpeg_bytes),
+            storage_key="other-key.jpg",
+            upload_ip="127.0.0.1",
+            user_id=other_user.id,
+        )
+        test_deps.session.add(other_image)
+        await test_deps.session.commit()
+
+        response = await client.get("/partials/gallery", cookies={AUTH_COOKIE_NAME: token})
+
+        assert response.status_code == 200
+        # Should show user's images
+        assert "myimage" in response.text or "my-key" in response.text
+        # Should NOT show other user's images
+        assert "otherimage" not in response.text
 
 
 class TestNavigation:
@@ -274,8 +328,9 @@ class TestNavigation:
 
     @pytest.mark.asyncio
     async def test_nav_shows_login_when_anonymous(self, client: AsyncClient):
-        """Navigation should show login link for anonymous users."""
-        response = await client.get("/")
+        """Navigation should show login link for anonymous users on login page."""
+        # Use login page since home page now redirects anonymous users
+        response = await client.get("/login")
 
         assert response.status_code == 200
         assert "login" in response.text.lower() or "sign in" in response.text.lower()
