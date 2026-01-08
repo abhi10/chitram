@@ -10,9 +10,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_cache
 from app.api.images import get_storage
+from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
-from app.services.auth_service import AuthService
+from app.services.auth import AuthError, create_auth_provider
 from app.services.cache_service import CacheService
 from app.services.image_service import ImageService
 from app.services.storage_service import StorageService
@@ -44,19 +45,29 @@ async def get_current_user_from_cookie(
     """
     Get current user from auth cookie.
 
-    Extracts JWT from cookie and delegates to AuthService.
+    Extracts JWT from cookie and uses the pluggable auth provider for verification.
+    Works with both local JWTs and Supabase tokens depending on AUTH_PROVIDER config.
     Returns None if not authenticated (allows anonymous access).
     """
     token = request.cookies.get(AUTH_COOKIE_NAME)
     if not token:
         return None
 
-    auth_service = AuthService(db)
-    user_id = auth_service.verify_token(token)
-    if not user_id:
+    # Use pluggable auth provider (handles both local and Supabase tokens)
+    settings = get_settings()
+    provider = create_auth_provider(db=db, settings=settings)
+    result = await provider.verify_token(token)
+
+    if isinstance(result, AuthError):
         return None
 
-    user = await auth_service.get_user_by_id(user_id)
+    # Get User model from local database
+    from sqlalchemy import select
+
+    stmt = select(User).where(User.id == result.local_user_id)
+    db_result = await db.execute(stmt)
+    user = db_result.scalar_one_or_none()
+
     if not user or not user.is_active:
         return None
 
