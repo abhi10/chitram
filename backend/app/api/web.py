@@ -90,14 +90,23 @@ async def home(
     service: ImageService = Depends(get_image_service),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Home page - Gallery of recent images."""
-    images = await service.list_recent(limit=20)
+    """Home page - User's gallery (requires auth per FR-4.1 unlisted model).
+
+    Per FR-4.1: System shall NOT provide a public listing of all images.
+    Images are unlisted - accessible only by direct URL or from owner's gallery.
+    """
+    if not user:
+        # Redirect anonymous users to login
+        return RedirectResponse(url="/login", status_code=302)
+
+    # Show only the authenticated user's images
+    images = await service.list_by_user(user.id)
     templates = get_templates(request)
 
     return templates.TemplateResponse(
         request=request,
         name="home.html",
-        context={"images": images, "user": user},
+        context={"images": images, "user": user, "image_count": len(images)},
     )
 
 
@@ -228,9 +237,23 @@ async def gallery_partial(
     offset: int = 0,
     limit: int = 20,
     service: ImageService = Depends(get_image_service),
+    user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Gallery partial - Load more images for HTMX infinite scroll."""
-    images = await service.list_recent(limit=limit, offset=offset)
+    """Gallery partial - Load more images for HTMX infinite scroll.
+
+    Per FR-4.1: Only shows the authenticated user's images.
+    Returns empty if not authenticated.
+    """
+    if not user:
+        # Return empty partial for unauthenticated users
+        templates = get_templates(request)
+        return templates.TemplateResponse(
+            request=request,
+            name="partials/gallery_items.html",
+            context={"images": [], "offset": 0},
+        )
+
+    images = await service.list_by_user(user.id, limit=limit, offset=offset)
     templates = get_templates(request)
 
     return templates.TemplateResponse(

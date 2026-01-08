@@ -216,3 +216,134 @@ class TestGetCurrentUserFromCookie:
         assert result is active_user
         assert result.id == "local-user-123"
         mock_create_provider.assert_called_once_with(db=db, settings=mock_settings)
+
+
+class TestPrivateGallery:
+    """Tests for FR-4.1: Private gallery - users only see their own images.
+
+    Per FR-4.1: System shall NOT provide a public listing of all images.
+    Images are unlisted - accessible only by direct URL or from owner's gallery.
+    """
+
+    @pytest.mark.asyncio
+    async def test_home_redirects_anonymous_to_login(self):
+        """Home page should redirect anonymous users to login."""
+        from app.api.web import home
+
+        request = MagicMock()
+        service = AsyncMock()
+
+        # user=None means anonymous
+        response = await home(request=request, service=service, user=None)
+
+        # Should redirect to login
+        assert response.status_code == 302
+        assert response.headers["location"] == "/login"
+        # Should NOT call list_recent (which shows all images)
+        service.list_recent.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_home_shows_only_users_own_images(self):
+        """Authenticated users should only see their own images."""
+        from app.api.web import home
+
+        request = MagicMock()
+        request.app.state.templates = MagicMock()
+        mock_template_response = MagicMock()
+        request.app.state.templates.TemplateResponse.return_value = mock_template_response
+
+        service = AsyncMock()
+        user_images = [MagicMock(id="img1"), MagicMock(id="img2")]
+        service.list_by_user.return_value = user_images
+
+        # Create authenticated user
+        user = MagicMock(spec=User)
+        user.id = "user-123"
+        user.email = "test@example.com"
+
+        await home(request=request, service=service, user=user)
+
+        # Should call list_by_user with user's ID
+        service.list_by_user.assert_called_once_with("user-123")
+        # Should NOT call list_recent (which shows all images)
+        service.list_recent.assert_not_called()
+        # Should render with user's images
+        request.app.state.templates.TemplateResponse.assert_called_once()
+        call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
+        assert call_kwargs["context"]["images"] == user_images
+        assert call_kwargs["context"]["user"] == user
+
+    @pytest.mark.asyncio
+    async def test_gallery_partial_returns_empty_for_anonymous(self):
+        """Gallery partial should return empty for anonymous users."""
+        from app.api.web import gallery_partial
+
+        request = MagicMock()
+        request.app.state.templates = MagicMock()
+        mock_template_response = MagicMock()
+        request.app.state.templates.TemplateResponse.return_value = mock_template_response
+
+        service = AsyncMock()
+
+        # user=None means anonymous
+        await gallery_partial(request=request, offset=0, limit=20, service=service, user=None)
+
+        # Should return empty list
+        call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
+        assert call_kwargs["context"]["images"] == []
+        # Should NOT call any service methods
+        service.list_recent.assert_not_called()
+        service.list_by_user.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_gallery_partial_shows_only_users_own_images(self):
+        """Gallery partial should only return authenticated user's images."""
+        from app.api.web import gallery_partial
+
+        request = MagicMock()
+        request.app.state.templates = MagicMock()
+        mock_template_response = MagicMock()
+        request.app.state.templates.TemplateResponse.return_value = mock_template_response
+
+        service = AsyncMock()
+        user_images = [MagicMock(id="img1"), MagicMock(id="img2")]
+        service.list_by_user.return_value = user_images
+
+        # Create authenticated user
+        user = MagicMock(spec=User)
+        user.id = "user-456"
+        user.email = "another@example.com"
+
+        await gallery_partial(request=request, offset=10, limit=20, service=service, user=user)
+
+        # Should call list_by_user with user's ID and pagination params
+        service.list_by_user.assert_called_once_with("user-456", limit=20, offset=10)
+        # Should NOT call list_recent (which shows all images)
+        service.list_recent.assert_not_called()
+        # Should render with user's images
+        call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
+        assert call_kwargs["context"]["images"] == user_images
+
+    @pytest.mark.asyncio
+    async def test_image_detail_accessible_by_direct_url(self):
+        """Image detail should be accessible by anyone with direct URL (unlisted model)."""
+        from app.api.web import image_detail
+
+        request = MagicMock()
+        request.app.state.templates = MagicMock()
+        mock_template_response = MagicMock()
+        request.app.state.templates.TemplateResponse.return_value = mock_template_response
+
+        service = AsyncMock()
+        image = MagicMock(id="img-123", user_id="owner-456")
+        service.get_by_id.return_value = image
+
+        # Anonymous user (user=None) accessing image by direct URL
+        await image_detail(request=request, image_id="img-123", service=service, user=None)
+
+        # Should be able to view the image
+        service.get_by_id.assert_called_once_with("img-123")
+        call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
+        assert call_kwargs["context"]["image"] == image
+        # is_owner should be falsy for anonymous (None or False)
+        assert not call_kwargs["context"]["is_owner"]
