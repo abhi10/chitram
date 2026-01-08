@@ -121,6 +121,11 @@ jobs:
         run: |
           bun run examples/comprehensive-test.ts http://localhost:8000
 
+      - name: Run auth flow tests
+        working-directory: browser-tests
+        run: |
+          bun run examples/auth-flow-test.ts http://localhost:8000
+
       - name: Upload screenshots
         if: always()
         uses: actions/upload-artifact@v4
