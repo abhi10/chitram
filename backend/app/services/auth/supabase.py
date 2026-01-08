@@ -9,7 +9,6 @@ import logging
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from supabase import Client, create_client
-from supabase.lib.client_options import ClientOptions
 
 from app.config import Settings
 from app.models.user import User
@@ -50,15 +49,10 @@ class SupabaseAuthProvider(AuthProvider):
         if not settings.supabase_anon_key:
             raise ValueError("SUPABASE_ANON_KEY is required for Supabase auth provider")
 
-        # Initialize Supabase client
-        options = ClientOptions(
-            auto_refresh_token=True,
-            persist_session=False,  # Server-side, no session persistence
-        )
+        # Initialize Supabase client (using defaults - no session persistence needed server-side)
         self._client: Client = create_client(
             settings.supabase_url,
             settings.supabase_anon_key,
-            options=options,
         )
 
     @property
