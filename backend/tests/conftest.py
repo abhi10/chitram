@@ -10,6 +10,10 @@ Both are explicit, visible, and testable.
 
 import io
 import os
+
+# Force local auth provider for tests (before any app imports)
+# This ensures tests don't accidentally use Supabase even if .env has AUTH_PROVIDER=supabase
+os.environ["AUTH_PROVIDER"] = "local"
 from collections.abc import AsyncGenerator
 from dataclasses import dataclass
 from pathlib import Path
