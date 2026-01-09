@@ -8,9 +8,10 @@
 - pytest for testing
 
 ## Current Status
-- **Current Phase:** Phase 3 deployed to production (https://chitram.io)
-- **Tests:** 225 passing
+- **Current Phase:** Phase 3.5 deployed to production (https://chitram.io)
+- **Tests:** 229 passing
 - **Production:** DigitalOcean droplet with Docker Compose, Caddy, PostgreSQL, MinIO, Redis
+- **Auth:** Supabase authentication with pluggable provider pattern
 
 ## Key Decisions
 - Using GitHub Codespaces for development (ADR-0007)
@@ -237,6 +238,49 @@ async def client(test_deps: TestDependencies):
 
 **Pattern:** Production uses `app.state` as container, tests use `TestDependencies`. Both explicit and mirrored.
 
+### 7. Pluggable Auth Provider Pattern (services/auth/)
+
+**CRITICAL:** Always use `create_auth_provider()` for token verification, never `AuthService` directly.
+
+```python
+# CORRECT - Works with both local JWT and Supabase tokens
+from app.services.auth import create_auth_provider
+
+provider = create_auth_provider(db=db, settings=settings)
+result = await provider.verify_token(token)
+if isinstance(result, AuthError):
+    return None  # Invalid token
+user_info = result  # UserInfo with local_user_id
+
+# WRONG - Only works with local JWT (breaks Supabase auth)
+from app.services.auth_service import AuthService
+auth_service = AuthService(db)
+user_id = auth_service.verify_token(token)  # Fails for Supabase tokens!
+```
+
+**Architecture:**
+```
+AuthProvider (ABC)
+├── LocalAuthProvider    # Uses JWT_SECRET_KEY
+└── SupabaseAuthProvider # Uses Supabase SDK
+
+create_auth_provider(settings) → Returns correct provider based on AUTH_PROVIDER env
+```
+
+**Key Files:**
+- `app/services/auth/base.py` - AuthProvider ABC, UserInfo, AuthError
+- `app/services/auth/local_provider.py` - Local JWT implementation
+- `app/services/auth/supabase_provider.py` - Supabase implementation
+- `app/services/auth/__init__.py` - Factory function `create_auth_provider()`
+
+**When changing auth code:**
+```bash
+# Always search for direct AuthService usage that should use provider instead
+grep -r "AuthService\|verify_token" --include="*.py" app/
+```
+
+**Related Incident:** [Nav Auth Bug Retrospective](docs/retrospectives/2026-01-08-supabase-nav-auth-bug.md)
+
 ## Important File Locations
 
 | Purpose | File | Key Content |
@@ -309,3 +353,16 @@ See `TODO.md` for detailed phase tracking.
 | Commit checklist | `.claude/rules/commit-checklist.md` | Pre-commit verification |
 | Ship skill | `.claude/commands/ship.md` | Full CI/CD workflow |
 | Validate skill | `.claude/commands/validate-deploy.md` | Deployment validation |
+| Post-deploy checklist | `docs/deployment/POST_DEPLOY_CHECKLIST.md` | Production verification after deploy |
+| Browser tests | `browser-tests/examples/auth-flow-test.ts` | E2E auth flow testing |
+
+## Post-Deployment Verification
+
+After CD pipeline deploys to production, verify:
+
+1. **Health check:** `curl https://chitram.io/health`
+2. **Auth flow:** Login → verify nav shows email + Logout (not Login/Register)
+3. **FR-4.1 compliance:** Home page shows only user's own images
+4. **E2E tests:** `cd browser-tests && bun run examples/auth-flow-test.ts https://chitram.io`
+
+See [POST_DEPLOY_CHECKLIST.md](docs/deployment/POST_DEPLOY_CHECKLIST.md) for full checklist.
