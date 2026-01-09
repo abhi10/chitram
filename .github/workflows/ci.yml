@@ -3,21 +3,12 @@ name: CI
 on:
   push:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/**'
-      - 'pyproject.toml'
   pull_request:
     branches: [main]
-    paths:
-      - 'backend/**'
-      - '.github/workflows/**'
-      - 'pyproject.toml'
 
-# Skip CI for documentation-only changes:
-# - docs/**
-# - *.md files (README, CLAUDE, TODO, etc.)
-# - browser-tests/** (separate workflow if needed)
+# Note: We removed path filtering because GitHub required status checks
+# don't work well with skipped workflows. CI runs on all PRs but is fast
+# for doc-only changes (lint/test still run but complete quickly).
 
 env:
   PYTHON_VERSION: "3.11"
