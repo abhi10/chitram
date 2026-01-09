@@ -24,6 +24,17 @@ router = APIRouter(tags=["web"])
 AUTH_COOKIE_NAME = "chitram_auth"
 
 
+def get_supabase_config() -> dict:
+    """Get Supabase config for frontend OAuth (safe to expose)."""
+    settings = get_settings()
+    if settings.auth_provider == "supabase":
+        return {
+            "supabase_url": settings.supabase_url or "",
+            "supabase_anon_key": settings.supabase_anon_key or "",
+        }
+    return {"supabase_url": "", "supabase_anon_key": ""}
+
+
 # =============================================================================
 # Dependencies
 # =============================================================================
@@ -172,7 +183,7 @@ async def login_page(
     return templates.TemplateResponse(
         request=request,
         name="login.html",
-        context={"user": None},
+        context={"user": None, **get_supabase_config()},
     )
 
 
@@ -189,7 +200,7 @@ async def register_page(
     return templates.TemplateResponse(
         request=request,
         name="register.html",
-        context={"user": None},
+        context={"user": None, **get_supabase_config()},
     )
 
 
@@ -199,6 +210,24 @@ async def logout():
     response = RedirectResponse(url="/", status_code=302)
     response.delete_cookie(AUTH_COOKIE_NAME)
     return response
+
+
+@router.get("/auth/callback", response_class=HTMLResponse)
+async def auth_callback(
+    request: Request,
+):
+    """OAuth callback page - Extracts tokens from URL hash and sets cookie.
+
+    Supabase OAuth redirects here with tokens in the URL fragment (#access_token=...).
+    Since URL fragments aren't sent to the server, we use JavaScript to extract
+    the token, set the auth cookie, and redirect to home.
+    """
+    templates = get_templates(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="auth_callback.html",
+        context={"user": None, **get_supabase_config()},
+    )
 
 
 # =============================================================================
