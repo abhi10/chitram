@@ -1,8 +1,8 @@
 # Chitram - TODO List & Progress Tracker
 
 **Repository:** https://github.com/abhi10/chitram
-**Current Phase:** Phase 2 Complete - Ready for Phase 3 (Web UI)
-**Last Updated:** 2026-01-03
+**Current Phase:** Phase 3.5 Complete - Supabase Auth + Production Deployed
+**Last Updated:** 2026-01-08
 
 ---
 
@@ -12,12 +12,13 @@
 |-------|--------|--------|-------------|
 | **Phase 1 Lean** | ✅ Complete | `main` | Core CRUD, validated 2025-12-24 |
 | **Phase 1.5** | ✅ Complete | `main` | Alembic + Pillow, merged 2025-12-31 |
-| **Phase 2A** | ✅ Complete | `feature2/phase2A-auth` | User Auth (JWT), 151 tests |
-| **Phase 2B** | ✅ Complete | `feature2/phase-2-redis-minio` | Thumbnails (FastAPI BackgroundTasks), 188 tests |
-| **Phase 3** | 📋 Planned | `feature/phase-3-ui` | Web UI (HTMX + Jinja2) |
-| **Phase 4** | ⏸️ Future | `feature/phase-4` | Advanced Features (Celery, Dedup) |
-| **Phase 5** | ⏸️ Future | `feature/phase-5` | Horizontal Scaling |
-| **Phase 6** | ⏸️ Future | `feature/phase-6` | Observability (Prometheus, Grafana)
+| **Phase 2A** | ✅ Complete | `main` | User Auth (JWT), 151 tests |
+| **Phase 2B** | ✅ Complete | `main` | Thumbnails (FastAPI BackgroundTasks), 188 tests |
+| **Phase 3** | ✅ Complete | `main` | Web UI (HTMX + Jinja2), deployed 2026-01-04 |
+| **Phase 3.5** | ✅ Complete | `main` | Supabase Auth Integration, 255 tests |
+| **Phase 4** | ⏸️ Future | - | Advanced Features (Celery, Dedup) |
+| **Phase 5** | ⏸️ Future | - | Horizontal Scaling |
+| **Phase 6** | ⏸️ Future | - | Observability (Prometheus, Grafana)
 
 ---
 
@@ -346,13 +347,13 @@ asyncio.run(main())
 
 ---
 
-## 🌐 Phase 3 - Web UI (PLANNED)
+## ✅ Phase 3 - Web UI (COMPLETE)
 
 **Goal:** Add web-based user interface using HTMX and Jinja2 templates
-**Status:** 📋 Planned
-**Branch:** `feature/phase-3-ui`
+**Status:** ✅ Complete - Deployed to production 2026-01-04
+**Branch:** `main` (merged from `feature/phase3A-foundation`)
 **Prerequisites:** Phase 2A Auth complete ✅, Phase 2B Thumbnails complete ✅
-**Estimated Effort:** 4-6 working days
+**Deployed:** https://chitram.io
 
 > **Architecture Decisions:**
 > - [ADR-0013: Web UI with HTMX](docs/adr/0013-web-ui-htmx.md) - Technology choice
@@ -508,96 +509,98 @@ asyncio.run(main())
 
 ---
 
-### Public Pages
-- [ ] **Home Page (Gallery):**
-  - [ ] Display gallery grid of recent public images
-  - [ ] Show thumbnails (300px) for fast loading
-  - [ ] Infinite scroll or pagination
-  - [ ] Click to navigate to image detail
-- [ ] **Image Detail Page:**
-  - [ ] Display full-size image
-  - [ ] Show metadata (filename, size, dimensions, upload date)
-  - [ ] "Copy Link" button
-  - [ ] Delete button (if owner)
-- [ ] **Navigation Bar:**
-  - [ ] Present on all pages
-  - [ ] Links: Home, Upload, Login/Register (or Profile if logged in)
-  - [ ] Show user email when authenticated
+### Phase 3 Summary
 
-### Authentication Pages
-- [ ] **Registration Page:**
-  - [ ] Email + password form
-  - [ ] Client-side email validation
-  - [ ] Redirect to home on success
-  - [ ] Inline error display
-- [ ] **Login Page:**
-  - [ ] Email + password form
-  - [ ] Store JWT in httpOnly cookie
-  - [ ] Redirect to home on success
-  - [ ] Link to registration
-- [ ] **Logout:**
-  - [ ] Clear JWT token
-  - [ ] Redirect to home
+All core UI features implemented:
+- ✅ Gallery with masonry layout and "Load More" pagination
+- ✅ Image detail page with metadata and actions
+- ✅ Login/Register forms with inline validation
+- ✅ My Images dashboard with delete functionality
+- ✅ Upload form with drag-and-drop, preview, progress
+- ✅ Responsive navigation with mobile hamburger menu
+- ✅ Cookie-based JWT authentication
 
-### Upload Page
-- [ ] **Upload Form:**
-  - [ ] File input with drag-and-drop
-  - [ ] File preview before upload
-  - [ ] Validate file type (JPEG/PNG only)
-  - [ ] Validate file size (max 5MB)
-- [ ] **Upload Progress:**
-  - [ ] Progress indicator during upload
-  - [ ] Redirect to image detail on success
-  - [ ] Error message on failure
-- [ ] **Anonymous Upload:**
-  - [ ] Display delete token prominently
-  - [ ] Warning: "Save this token! It's the only way to delete this image."
-
-### User Dashboard
-- [ ] **My Images Page:**
-  - [ ] Display all images uploaded by current user
-  - [ ] Delete button on each image
-  - [ ] Confirmation dialog before delete
-
-### Technical Implementation
-- [ ] **Templates Structure:**
-  - [ ] Create `backend/app/templates/` directory
-  - [ ] `base.html` - Layout with TailwindCSS
-  - [ ] `home.html` - Gallery grid
-  - [ ] `upload.html` - Upload form
-  - [ ] `image.html` - Image detail
-  - [ ] `login.html`, `register.html` - Auth forms
-  - [ ] `my_images.html` - User dashboard
-  - [ ] `partials/` - HTMX fragments
-- [ ] **Static Assets:**
-  - [ ] `backend/app/static/css/styles.css` - TailwindCSS output
-  - [ ] `backend/app/static/js/htmx.min.js` - HTMX library
-- [ ] **Route Handlers:**
-  - [ ] Create `backend/app/api/web.py` for template routes
-  - [ ] HTMX for partial page updates
-  - [ ] CSRF protection on all forms
-- [ ] **Security:**
-  - [ ] JWT stored in httpOnly cookies (not localStorage)
-  - [ ] CSRF protection enabled
-  - [ ] XSS prevention (sanitize user input)
-- [ ] **Responsive Design:**
-  - [ ] Mobile, tablet, desktop layouts
-  - [ ] Gallery grid adjusts to viewport
-  - [ ] Hamburger menu on mobile
-
-### Testing
-- [ ] Template route tests
-- [ ] HTMX interaction tests
-- [ ] Responsive design verification
-- [ ] Accessibility checks (alt text, labels, keyboard nav)
-
-### Validation & Merge
-- [ ] All tests passing
-- [ ] UI works on mobile/tablet/desktop
-- [ ] Merge to main, tag `v0.3.0-ui`
+**Deferred to future:**
+- ⏳ httpOnly cookies (currently JS-accessible)
+- ⏳ CSRF protection middleware
+- ⏳ Toast notifications
+- ⏳ Keyboard navigation audit
 
 **Requirements:** [docs/requirements/phase3.md](./docs/requirements/phase3.md)
 **ADR:** [ADR-0013: Web UI with HTMX](docs/adr/0013-web-ui-htmx.md)
+
+---
+
+## ✅ Phase 3.5 - Supabase Auth Integration (COMPLETE)
+
+**Goal:** Replace local JWT auth with Supabase Auth for production-ready authentication
+**Status:** ✅ Complete - Deployed 2026-01-07
+**Branch:** `main` (merged from PRs #31-34)
+**Tests:** 255 passing
+
+> **Architecture Decision:** Pluggable auth provider pattern allows switching between local JWT and Supabase without code changes.
+
+**Why This Matters:**
+- Production-ready auth (Supabase handles password reset, email verification)
+- Social login ready (OAuth providers)
+- Simpler deployment (no JWT secret management)
+
+### Implementation
+- [x] **Pluggable Auth Provider:**
+  - [x] Create `app/services/auth/` package with provider abstraction
+  - [x] `AuthProvider` abstract base class with `verify_token()`, `login()`, `register()`
+  - [x] `LocalAuthProvider` - existing JWT auth (for tests)
+  - [x] `SupabaseAuthProvider` - Supabase client integration
+  - [x] `create_auth_provider()` factory function
+  - [x] Configuration via `AUTH_PROVIDER` env var (local|supabase)
+- [x] **Supabase Integration:**
+  - [x] Add `supabase` dependency to pyproject.toml
+  - [x] Create Supabase project (chitram.supabase.co)
+  - [x] Configure `SUPABASE_URL` and `SUPABASE_ANON_KEY` in .env
+  - [x] Verify tokens using Supabase JWT verification
+  - [x] Create users in local DB on first Supabase login
+- [x] **Web UI Cookie Auth Fix (PR #36):**
+  - [x] Update `get_current_user_from_cookie()` to use pluggable provider
+  - [x] Fix nav bar showing "Login" after Supabase login
+  - [x] Incident retrospective documented
+- [x] **Security Fix (PR #38):**
+  - [x] Enforce FR-4.1 "unlisted model" - home shows only user's images
+  - [x] Anonymous users redirected to login
+  - [x] Direct URL access still works for any image
+- [x] **Testing:**
+  - [x] Unit tests for both auth providers (67 tests)
+  - [x] Integration tests with mock Supabase responses
+  - [x] E2E browser tests for auth flow
+  - [x] All 255 tests passing
+- [x] **Documentation:**
+  - [x] Supabase integration learnings (`docs/learning/supabase-integration-learnings.md`)
+  - [x] Incident retrospective (`docs/retrospectives/2026-01-08-supabase-nav-auth-bug.md`)
+  - [x] Post-deploy checklist (`docs/deployment/POST_DEPLOY_CHECKLIST.md`)
+  - [x] Auth provider pattern in CLAUDE.md
+
+### Key Pattern: Pluggable Auth Provider
+
+**CRITICAL:** Always use `create_auth_provider()` for token verification:
+
+```python
+# CORRECT - Works with both local and Supabase
+from app.services.auth import create_auth_provider
+provider = create_auth_provider(db=db, settings=settings)
+result = await provider.verify_token(token)
+
+# WRONG - Only works with local JWT
+from app.services.auth_service import AuthService
+auth_service = AuthService(db)
+user_id = auth_service.verify_token(token)  # Fails for Supabase!
+```
+
+**Related PRs:**
+- [PR #31](https://github.com/abhi10/chitram/pull/31) - Pluggable auth provider infrastructure
+- [PR #32](https://github.com/abhi10/chitram/pull/32) - Supabase provider implementation
+- [PR #33](https://github.com/abhi10/chitram/pull/33) - Web UI integration
+- [PR #34](https://github.com/abhi10/chitram/pull/34) - Bug fixes and deployment
+- [PR #36](https://github.com/abhi10/chitram/pull/36) - Nav auth state fix
+- [PR #38](https://github.com/abhi10/chitram/pull/38) - FR-4.1 security fix
 
 ---
 
@@ -914,47 +917,25 @@ git push origin --delete feature/phase-X.X
 
 ## 🎯 Current Focus
 
-**Phase 2 - Complete:**
-1. ✅ MinIO Backend - Complete & Validated in Codespaces!
-2. ✅ CI/CD Pipeline - GitHub Actions workflow added!
-3. ✅ Redis caching layer - Complete with Cache-Aside pattern!
-4. ✅ Rate limiting - Complete with fail-open design!
-5. ✅ Concurrency control - Complete with ADR-0010!
-6. ✅ User authentication (JWT) - Complete (151 tests)!
-7. ✅ Thumbnails (FastAPI BackgroundTasks) - Complete (188 tests)!
+**Current State:** Phase 3.5 Complete - Production deployed at https://chitram.io
 
-**Up Next:**
-- Phase 3: Web UI (HTMX + Jinja2)
+**Recently Completed:**
+- ✅ Supabase Auth Integration (Phase 3.5)
+- ✅ FR-4.1 Security Fix - Private galleries
+- ✅ Web UI with HTMX (Phase 3)
+- ✅ CD Pipeline with GitHub Actions
+- ✅ Production deployment on DigitalOcean
 
-**Completed (Phase 2 - MinIO + CI + Redis + Rate Limiting + Concurrency):**
-- ✅ MinioStorageBackend implementation (Strategy Pattern)
-- ✅ Docker Compose with MinIO + Redis services
-- ✅ Configuration-based backend selection
-- ✅ Redis caching with Cache-Aside pattern (ADR-0009)
-- ✅ X-Cache header (HIT/MISS/DISABLED)
-- ✅ Graceful degradation when Redis unavailable
-- ✅ Rate limiting (10 req/IP/min, 429 + Retry-After)
-- ✅ Fail-open design for rate limiter
-- ✅ Concurrency control (10 concurrent uploads, 503 on timeout) - ADR-0010
-- ✅ Shared API dependencies module (`app/api/dependencies.py`)
-- ✅ Unit tests (12 concurrency + 22 rate limiter + 19 cache + 11 MinIO + 17 performance) + Integration tests (11 Redis + 9 MinIO) + API tests (11)
-- ✅ All 114 tests passing
-- ✅ GitHub Actions CI workflow (lint, test, dependency-check)
-- ✅ Automation scripts (validate-env, run-tests, smoke-test, cleanup)
-- ✅ Codespaces Runbook + Phase 2 Retrospective docs
+**Up Next (Phase 4):**
+- [ ] Celery for background jobs
+- [ ] Image deduplication
+- [ ] Multiple thumbnail sizes
 
-**Key Learnings (Phase 2 Retro):**
-- 6 issues encountered, 4 blockers (all dependency-related)
-- Root cause: Local env had global packages not in pyproject.toml
-- Prevention: CI pipeline now catches missing deps before merge
-- Process: "Import → Add dependency → Commit together"
-- See: `docs/PHASE2_RETRO.md` for full analysis
-
-**Completed (Phase 1.5):**
-- ✅ Alembic migrations setup (2 migrations)
-- ✅ Pillow integration for image dimensions
-- ✅ All 11 API tests passing
-- ✅ Merged to main 2025-12-31
+**Production Status:**
+- 🌐 Live at: https://chitram.io
+- 🔒 Auth: Supabase (production) / Local JWT (tests)
+- 📊 Tests: 255 passing
+- 🚀 CD: Auto-deploy on merge to main
 
 ---
 
@@ -967,15 +948,17 @@ Phase 1 Lean    ✅ Complete (Validated 2025-12-24)
 Phase 1.5       ✅ Complete (Merged 2025-12-31)
 Phase 2A Auth   ✅ Complete (151 tests, 2026-01-03)
 Phase 2B        ✅ Complete (188 tests, 2026-01-03)
-Phase 3         📋 Next - Web UI (HTMX + Jinja2)
+Phase 3         ✅ Complete (Web UI deployed 2026-01-04)
+Phase 3.5       ✅ Complete (Supabase Auth, 255 tests, 2026-01-08)
 Phase 4         ⏸️ Future - Advanced Features (Celery, Dedup)
 Phase 5         ⏸️ Future - Horizontal Scaling
 Phase 6         ⏸️ Future - Observability
 ```
 
-**Current Status:** 🟢 On track
+**Current Status:** 🟢 Production deployed
+**Production URL:** https://chitram.io
 **Blockers:** None
-**Last Updated:** 2026-01-03
+**Last Updated:** 2026-01-08
 
 ---
 
@@ -998,7 +981,13 @@ Phase 6         ⏸️ Future - Observability
 - [x] **2026-01-03:** Phase 2A Auth complete (ADR-0011, 151 tests passing)
 - [x] **2026-01-03:** Phase restructuring - Phase 3 (UI), Phase 4 (Advanced), Phase 5 (Scaling), Phase 6 (Observability)
 - [x] **2026-01-03:** Phase 2B Thumbnails complete (FastAPI BackgroundTasks, 37 new tests, 188 total)
-- [ ] **Next:** Phase 3 Web UI (HTMX + Jinja2)
+- [x] **2026-01-04:** Phase 3 Web UI complete (HTMX + Jinja2 templates)
+- [x] **2026-01-04:** 🚀 First production deployment to DigitalOcean (https://chitram.io)
+- [x] **2026-01-05:** CD pipeline implemented (auto-deploy on merge to main)
+- [x] **2026-01-07:** Phase 3.5 Supabase Auth integrated (PRs #31-34)
+- [x] **2026-01-08:** Nav auth state bug fixed (PR #36) - Incident retrospective created
+- [x] **2026-01-08:** FR-4.1 security fix - Private galleries (PR #38)
+- [x] **2026-01-08:** Post-deploy checklist and auth retro action items (PR #39)
 - [ ] **Future:** Phase 4 Advanced Features (Celery, Dedup)
 - [ ] **Future:** Phase 5 Horizontal Scaling
 - [ ] **Future:** Phase 6 Observability
