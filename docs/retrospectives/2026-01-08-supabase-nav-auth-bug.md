@@ -118,10 +118,10 @@ result = await provider.verify_token(token)  # Uses correct provider
 
 | Action | Owner | Priority | Due Date | Status |
 |--------|-------|----------|----------|--------|
-| Add E2E test: login → verify nav shows logged-in state | Team | P1 | 2026-01-15 | [ ] |
-| Add post-deploy checklist item for web UI auth state | Team | P2 | 2026-01-10 | [ ] |
-| Audit for other places using AuthService directly | Team | P2 | 2026-01-12 | [ ] |
-| Document "auth provider pattern" in CLAUDE.md | Team | P3 | 2026-01-15 | [ ] |
+| Add E2E test: login → verify nav shows logged-in state | Team | P1 | 2026-01-15 | [x] Exists in `browser-tests/examples/auth-flow-test.ts` |
+| Add post-deploy checklist item for web UI auth state | Team | P2 | 2026-01-10 | [x] `docs/deployment/POST_DEPLOY_CHECKLIST.md` |
+| Audit for other places using AuthService directly | Team | P2 | 2026-01-12 | [x] Audited - only delete token methods used (OK) |
+| Document "auth provider pattern" in CLAUDE.md | Team | P3 | 2026-01-15 | [x] Added to Key Implementation Patterns (#7) |
 
 ---
 
