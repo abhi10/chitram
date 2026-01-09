@@ -51,6 +51,18 @@
     <!-- HTMX -->
     <script src="https://unpkg.com/htmx.org@1.9.10" integrity="sha384-D1Kt99CQMDuVetoL1lrYwg5t+9QdHe7NLX/SoJYkXDFfX37iInKRy5xLSi8nO7UC" crossorigin="anonymous"></script>
 
+    <!-- Supabase JS Client (for OAuth) -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script>
+        // Initialize Supabase client for OAuth (config injected from server)
+        window.SUPABASE_URL = '{{ supabase_url | default("") }}';
+        window.SUPABASE_ANON_KEY = '{{ supabase_anon_key | default("") }}';
+
+        if (window.SUPABASE_URL && window.SUPABASE_ANON_KEY) {
+            window.supabase = supabase.createClient(window.SUPABASE_URL, window.SUPABASE_ANON_KEY);
+        }
+    </script>
+
     <!-- Custom Styles -->
     <style>
         /* Base styles */
