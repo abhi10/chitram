@@ -17,8 +17,8 @@
 | **Phase 3** | ✅ Complete | `main` | Web UI (HTMX + Jinja2), deployed 2026-01-04 |
 | **Phase 3.5** | ✅ Complete | `main` | Supabase Auth Integration, 255 tests |
 | **Phase 4** | ⏸️ Future | - | Advanced Features (Celery, Dedup) |
-| **Phase 5** | ⏸️ Future | - | Horizontal Scaling |
-| **Phase 6** | ⏸️ Future | - | Observability (Prometheus, Grafana)
+| **Phase 5** | ⏸️ Future | - | Distributed Cache (Consistent Hashing) |
+| **Phase 6** | ⏸️ Future | - | Basic Observability (Prometheus)
 
 ---
 
@@ -666,104 +666,123 @@ user_id = auth_service.verify_token(token)  # Fails for Supabase!
 
 ---
 
-## 🚀 Phase 5 - Horizontal Scaling (FUTURE)
+## 🚀 Phase 5 - Distributed Cache (FUTURE)
 
-**Goal:** Scale to 1000s of concurrent users
+**Goal:** Learn distributed systems through hands-on cache implementation
 **Status:** ⏸️ Not started
-**Branch:** `feature/phase-5`
-**Prerequisites:** Phase 4 complete
+**Branch:** `feature/phase-5-distributed-cache`
+**Prerequisites:** Phase 4 complete (or can be done independently)
+
+> **Learning Focus:** Implement distributed cache with consistent hashing.
+> This is the core distributed systems building block from the AOSA paper.
+> See: https://aosabook.org/en/v2/distsys.html (Caches section)
+
+### Why Distributed Cache?
+- **Current state:** Single Redis instance (local cache)
+- **Target state:** Data partitioned across multiple Redis nodes
+- **Learning outcome:** Understand consistent hashing, data partitioning, node failure handling
 
 ### Implementation Checklist
-- [ ] **Create feature branch** - `git checkout -b feature/phase-5`
-- [ ] **Load Balancer (Nginx):**
-  - [ ] Add Nginx to docker-compose
-  - [ ] Configure round-robin
-  - [ ] Health checks
-  - [ ] SSL termination
-  - [ ] Test with 3 API instances
-- [ ] **Database Replication:**
-  - [ ] Setup PostgreSQL streaming replication
-  - [ ] 1 primary + 2 read replicas
-  - [ ] Add read/write connection pools
-  - [ ] Update code to use read replicas for queries
-  - [ ] Test failover
-- [ ] **Storage Sharding:**
-  - [ ] Implement consistent hashing
-  - [ ] Shard across multiple S3 buckets
-  - [ ] Update storage router
-- [ ] **Redis Cluster:**
-  - [ ] 3 master nodes
-  - [ ] Sentinel for failover
-  - [ ] Session storage
-- [ ] **CDN Integration:**
-  - [ ] CloudFront or Cloudflare
-  - [ ] Cache image files at edge
-  - [ ] Update image URLs
-- [ ] **Load Testing:**
-  - [ ] Use Locust for testing
-  - [ ] Target: 1000 concurrent users
-  - [ ] Measure p95 latency
-  - [ ] Identify bottlenecks
-- [ ] **Validation:**
-  - [ ] No single point of failure
-  - [ ] Automatic failover working
-  - [ ] 10x Phase 2 load capacity
-- [ ] **Merge & Tag:**
-  - [ ] Merge to main
-  - [ ] Tag `v0.5.0`
 
-**Reference:** `docs/archive/phase-execution-plan.md`
+#### Phase 5A: Client-Side Consistent Hashing
+- [ ] **Create feature branch** - `git checkout -b feature/phase-5-distributed-cache`
+- [ ] **Algorithm Implementation:**
+  - [ ] Implement consistent hashing ring in `app/services/hash_ring.py`
+  - [ ] Use MD5 or SHA-256 for key hashing
+  - [ ] Support virtual nodes (150 per physical node)
+  - [ ] Add/remove nodes with minimal key redistribution
+- [ ] **Distributed Cache Service:**
+  - [ ] Create `app/services/distributed_cache_service.py`
+  - [ ] Replace single Redis connection with node pool
+  - [ ] Route keys to correct node using hash ring
+  - [ ] Graceful degradation when node unavailable
+- [ ] **Configuration:**
+  - [ ] `REDIS_NODES` env var (comma-separated host:port)
+  - [ ] `CACHE_VIRTUAL_NODES` (default: 150)
+  - [ ] Backward compatible with single Redis
+- [ ] **Testing:**
+  - [ ] Unit tests for hash ring (key distribution, node addition/removal)
+  - [ ] Integration tests with 3 Redis instances in docker-compose
+  - [ ] Verify key distribution is balanced (~33% per node)
+
+#### Phase 5B: Node Failure Handling
+- [ ] **Health Monitoring:**
+  - [ ] Periodic health check for each Redis node
+  - [ ] Mark unhealthy nodes as down in hash ring
+  - [ ] Automatic failover to next node on ring
+- [ ] **Metrics:**
+  - [ ] Cache hit/miss rate per node
+  - [ ] Key distribution visualization (optional)
+- [ ] **Documentation:**
+  - [ ] ADR for distributed cache design
+  - [ ] Learnings document
+
+### Descoped (Deferred to Later)
+The following items were removed from MVP scope:
+
+| Item | Reason |
+|------|--------|
+| ~~Storage Sharding~~ | Overkill for image hosting scale |
+| ~~Database Replication~~ | Single PostgreSQL sufficient for now |
+| ~~Load Balancer (Nginx)~~ | Caddy already handles this in production |
+| ~~Redis Sentinel/Cluster~~ | Client-side hashing is simpler to learn |
+| ~~CDN Integration~~ | Can add later without code changes |
+
+**Reference:** `docs/architecture/BUILDING_BLOCKS.md`
 
 ---
 
-## 📊 Phase 6 - Observability (FUTURE)
+## 📊 Phase 6 - Basic Observability (FUTURE)
 
-**Goal:** Production-ready monitoring and reliability
+**Goal:** Add metrics to visualize cache behavior and API performance
 **Status:** ⏸️ Not started
-**Branch:** `feature/phase-6`
-**Prerequisites:** Phase 5 complete
+**Branch:** `feature/phase-6-observability`
+**Prerequisites:** Phase 5 complete (or can be done independently)
+
+> **Learning Focus:** Understand application metrics and visualization.
+> Essential for validating distributed cache performance.
+
+### Why Observability Now?
+- **Distributed Cache needs metrics:** Can't verify key distribution without visibility
+- **API performance baseline:** Understand latency before/after changes
+- **Simple to add:** `prometheus-fastapi-instrumentator` is plug-and-play
 
 ### Implementation Checklist
-- [ ] **Create feature branch** - `git checkout -b feature/phase-6`
-- [ ] **Prometheus & Grafana:**
-  - [ ] Deploy Prometheus server
-  - [ ] Add instrumentation to API
-  - [ ] Create Grafana dashboards
-  - [ ] Track: requests/sec, errors, latency, storage
-- [ ] **Logging (Loki or ELK):**
-  - [ ] Structured logging setup
-  - [ ] Deploy logging stack
-  - [ ] Request tracing
-  - [ ] Error aggregation
-- [ ] **Distributed Tracing (Jaeger):**
-  - [ ] Add Jaeger instrumentation
-  - [ ] Trace request flow
-  - [ ] Identify bottlenecks
-- [ ] **Alerting:**
-  - [ ] Define alert rules
-  - [ ] Setup PagerDuty/Slack
-  - [ ] Test alert firing
-  - [ ] Create runbooks
-- [ ] **Circuit Breakers:** (Graphiti pattern)
-  - [ ] Add circuit breaker library (e.g., `aiobreaker`)
-  - [ ] Protect storage operations (fail fast on repeated errors)
-  - [ ] Protect external service calls
-  - [ ] Graceful degradation with fallback responses
-  - [ ] Retry with exponential backoff
-- [ ] **Health Checks:**
-  - [ ] Liveness probe
-  - [ ] Readiness probe
-  - [ ] Dependency checks
-- [ ] **Validation:**
-  - [ ] All metrics collecting
-  - [ ] Dashboards showing real-time data
-  - [ ] Alerts firing correctly
-  - [ ] 99.9% uptime target
-- [ ] **Merge & Tag:**
-  - [ ] Merge to main
-  - [ ] Tag `v1.0.0` (Production Ready!)
 
-**Reference:** `docs/archive/phase-execution-plan.md`
+#### Phase 6A: Prometheus Metrics
+- [ ] **Create feature branch** - `git checkout -b feature/phase-6-observability`
+- [ ] **Add Instrumentation:**
+  - [ ] Add `prometheus-fastapi-instrumentator` dependency
+  - [ ] Enable `/metrics` endpoint
+  - [ ] Auto-instrumented: request count, latency, status codes
+- [ ] **Custom Metrics:**
+  - [ ] Cache hit/miss counter (per node if distributed)
+  - [ ] Upload size histogram
+  - [ ] Concurrent uploads gauge
+- [ ] **Configuration:**
+  - [ ] `METRICS_ENABLED` env var (default: true)
+  - [ ] `/metrics` endpoint (Prometheus format)
+
+#### Phase 6B: Grafana Dashboard (Optional)
+- [ ] **Local Development:**
+  - [ ] Add Grafana to docker-compose.yml
+  - [ ] Pre-configured dashboard JSON
+  - [ ] Visualize: request rate, latency p50/p95/p99, cache hit rate
+- [ ] **Production:**
+  - [ ] Grafana Cloud free tier (or self-hosted)
+  - [ ] Alert on high error rate (>1%)
+
+### Descoped (Deferred to Later)
+The following items were removed from MVP scope:
+
+| Item | Reason |
+|------|--------|
+| ~~Distributed Tracing (Jaeger)~~ | Overkill for single-service architecture |
+| ~~Circuit Breakers~~ | Already have graceful degradation |
+| ~~Loki/ELK Logging Stack~~ | Docker logs sufficient for now |
+| ~~PagerDuty/Slack Alerting~~ | Can add when needed |
+
+**Reference:** `docs/architecture/BUILDING_BLOCKS.md`
 
 ---
 
@@ -925,11 +944,14 @@ git push origin --delete feature/phase-X.X
 - ✅ Web UI with HTMX (Phase 3)
 - ✅ CD Pipeline with GitHub Actions
 - ✅ Production deployment on DigitalOcean
+- ✅ Descoped Phase 5/6 for MVP focus
 
-**Up Next (Phase 4):**
-- [ ] Celery for background jobs
-- [ ] Image deduplication
-- [ ] Multiple thumbnail sizes
+**Up Next (Phase 5 - Distributed Cache):**
+- [ ] Implement consistent hashing ring algorithm
+- [ ] Create distributed cache service with multi-node support
+- [ ] Add integration tests with 3 Redis instances
+
+> **Note:** Phase 5 can be done independently of Phase 4. Phase 4 (Celery, Dedup) is optional and can be skipped.
 
 **Production Status:**
 - 🌐 Live at: https://chitram.io
@@ -950,9 +972,9 @@ Phase 2A Auth   ✅ Complete (151 tests, 2026-01-03)
 Phase 2B        ✅ Complete (188 tests, 2026-01-03)
 Phase 3         ✅ Complete (Web UI deployed 2026-01-04)
 Phase 3.5       ✅ Complete (Supabase Auth, 255 tests, 2026-01-08)
-Phase 4         ⏸️ Future - Advanced Features (Celery, Dedup)
-Phase 5         ⏸️ Future - Horizontal Scaling
-Phase 6         ⏸️ Future - Observability
+Phase 4         ⏸️ Future - Advanced Features (Celery, Dedup) [Optional]
+Phase 5         ⏸️ Future - Distributed Cache (Consistent Hashing) ← Next
+Phase 6         ⏸️ Future - Basic Observability (Prometheus)
 ```
 
 **Current Status:** 🟢 Production deployed
@@ -988,9 +1010,10 @@ Phase 6         ⏸️ Future - Observability
 - [x] **2026-01-08:** Nav auth state bug fixed (PR #36) - Incident retrospective created
 - [x] **2026-01-08:** FR-4.1 security fix - Private galleries (PR #38)
 - [x] **2026-01-08:** Post-deploy checklist and auth retro action items (PR #39)
-- [ ] **Future:** Phase 4 Advanced Features (Celery, Dedup)
-- [ ] **Future:** Phase 5 Horizontal Scaling
-- [ ] **Future:** Phase 6 Observability
+- [x] **2026-01-08:** Descoped Phase 5/6 for MVP focus (removed over-engineering)
+- [ ] **Future:** Phase 5 Distributed Cache (Consistent Hashing) ← Learning focus
+- [ ] **Future:** Phase 6 Basic Observability (Prometheus)
+- [ ] **Optional:** Phase 4 Advanced Features (Celery, Dedup)
 - [ ] **Target:** v1.0.0 production-ready system
 
 ---
