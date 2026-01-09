@@ -1,6 +1,23 @@
-# Image Hosting App
+# Chitram - Image Hosting App
 
-A simple image hosting API built with FastAPI for learning distributed systems concepts.
+A production-ready image hosting application built with FastAPI, featuring a web UI and Supabase authentication.
+
+**Live Demo:** https://chitram.io
+
+## Features
+
+- **Web UI** - Upload, view, and manage images with a responsive gallery
+- **Authentication** - Secure login via Supabase (email/password)
+- **Private Galleries** - Each user sees only their own images
+- **Thumbnails** - Auto-generated 300px thumbnails for fast loading
+- **API** - Full REST API with Swagger documentation
+
+## Tech Stack
+
+- **Backend:** FastAPI, PostgreSQL, MinIO (S3-compatible storage)
+- **Frontend:** HTMX, Jinja2, TailwindCSS
+- **Auth:** Supabase (production) / Local JWT (development)
+- **Infrastructure:** DigitalOcean, Docker, Caddy
 
 ## Quick Start
 
@@ -10,17 +27,15 @@ A simple image hosting API built with FastAPI for learning distributed systems c
 
 [![Open in GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new)
 
-1. Push this repo to GitHub
-2. Go to your repo → Click **Code** → **Codespaces** → **Create codespace**
-3. Wait 2-3 minutes for setup
-4. Start the API:
+1. Go to your repo -> Click **Code** -> **Codespaces** -> **Create codespace**
+2. Wait 2-3 minutes for setup
+3. Start the API:
    ```bash
    cd backend
    uv run uvicorn app.main:app --reload --host 0.0.0.0
    ```
-5. Click the popup to open port 8000 → Access Swagger at `/docs`
-
-**Free tier:** 60 hours/month (plenty for learning!)
+4. Click the popup to open port 8000
+5. Access the app at the forwarded URL
 
 ### Using Local DevContainer
 
@@ -34,7 +49,7 @@ A simple image hosting API built with FastAPI for learning distributed systems c
    cd backend
    uv run uvicorn app.main:app --reload --host 0.0.0.0
    ```
-5. Open http://localhost:8000/docs
+5. Open http://localhost:8000
 
 ### Manual Setup
 
@@ -66,23 +81,44 @@ uv run alembic upgrade head
 uv run uvicorn app.main:app --reload
 ```
 
+## Web Pages
+
+| Page | URL | Description |
+|------|-----|-------------|
+| Home | `/` | Your image gallery (login required) |
+| Upload | `/upload` | Upload new images |
+| My Images | `/my-images` | Manage your uploads |
+| Login | `/login` | Sign in |
+| Register | `/register` | Create account |
+
 ## API Endpoints
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/v1/images/upload` | Upload an image |
-| GET | `/api/v1/images/{id}` | Get image metadata |
-| GET | `/api/v1/images/{id}/file` | Download image file |
-| DELETE | `/api/v1/images/{id}` | Delete an image |
-| GET | `/health` | Health check |
-| GET | `/docs` | Swagger UI |
+| Method | Endpoint | Description | Auth |
+|--------|----------|-------------|------|
+| POST | `/api/v1/images/upload` | Upload an image | Required |
+| GET | `/api/v1/images/{id}` | Get image metadata | - |
+| GET | `/api/v1/images/{id}/file` | Download image file | - |
+| GET | `/api/v1/images/{id}/thumbnail` | Get thumbnail | - |
+| DELETE | `/api/v1/images/{id}` | Delete an image | Owner only |
+| POST | `/api/v1/auth/register` | Create account | - |
+| POST | `/api/v1/auth/login` | Get JWT token | - |
+| GET | `/api/v1/auth/me` | Current user profile | Required |
+| GET | `/health` | Health check | - |
+| GET | `/docs` | Swagger UI | - |
 
 ## Usage Examples
 
-### Upload an image
+### Upload an image (authenticated)
 
 ```bash
+# Get a token first
+TOKEN=$(curl -s -X POST http://localhost:8000/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"user@example.com","password":"yourpassword"}' | jq -r '.access_token')
+
+# Upload with token
 curl -X POST http://localhost:8000/api/v1/images/upload \
+  -H "Authorization: Bearer $TOKEN" \
   -F "file=@photo.jpg"
 ```
 
@@ -98,12 +134,6 @@ curl http://localhost:8000/api/v1/images/{image_id}
 curl http://localhost:8000/api/v1/images/{image_id}/file --output image.jpg
 ```
 
-### Delete image
-
-```bash
-curl -X DELETE http://localhost:8000/api/v1/images/{image_id}
-```
-
 ## Development
 
 ### Run Tests
@@ -111,7 +141,7 @@ curl -X DELETE http://localhost:8000/api/v1/images/{image_id}
 ```bash
 cd backend
 
-# All tests
+# All tests (255 tests)
 uv run pytest
 
 # With coverage
@@ -123,15 +153,15 @@ uv run pytest tests/api/test_images.py -v
 
 ### Code Quality
 
+Pre-commit hooks run automatically on every commit:
+
 ```bash
-# Format
-uv run black .
+# Run manually
+uv run pre-commit run --all-files
 
-# Lint
-uv run ruff check --fix .
-
-# Type check
-uv run mypy app/
+# Or individual tools
+uv run ruff check --fix .  # Lint
+uv run ruff format .       # Format
 ```
 
 ### Database Migrations
@@ -150,23 +180,29 @@ uv run alembic downgrade -1
 ## Project Structure
 
 ```
-image-hosting-app/
+chitram/
 ├── backend/
 │   ├── app/
-│   │   ├── api/           # Route handlers
+│   │   ├── api/           # Route handlers (images, auth, web)
 │   │   ├── models/        # SQLAlchemy models
 │   │   ├── schemas/       # Pydantic schemas
 │   │   ├── services/      # Business logic
-│   │   ├── utils/         # Helpers
+│   │   │   └── auth/      # Pluggable auth providers
+│   │   ├── templates/     # Jinja2 templates
+│   │   ├── static/        # CSS, JS
 │   │   ├── main.py        # FastAPI app
 │   │   ├── config.py      # Settings
 │   │   └── database.py    # DB setup
-│   ├── tests/
-│   ├── pyproject.toml
-│   └── .env.example
+│   ├── tests/             # 255 tests
+│   ├── alembic/           # DB migrations
+│   └── pyproject.toml
+├── browser-tests/         # E2E tests with Playwright
 ├── docs/
-│   ├── adr/               # Architecture decisions
-│   └── ...
+│   ├── adr/               # Architecture decisions (15 ADRs)
+│   ├── deployment/        # Deployment guides
+│   ├── retrospectives/    # Incident retrospectives
+│   └── requirements/      # Phase requirements
+├── scripts/               # Automation scripts
 └── .devcontainer/         # Dev environment
 ```
 
@@ -178,16 +214,32 @@ Environment variables (see `.env.example`):
 |----------|-------------|---------|
 | `DATABASE_URL` | PostgreSQL connection string | - |
 | `STORAGE_BACKEND` | `local` or `minio` | `minio` |
+| `AUTH_PROVIDER` | `local` or `supabase` | `local` |
+| `SUPABASE_URL` | Supabase project URL | - |
+| `SUPABASE_ANON_KEY` | Supabase anonymous key | - |
 | `MAX_FILE_SIZE_MB` | Max upload size | `5` |
 | `ALLOWED_CONTENT_TYPES` | Accepted MIME types | `image/jpeg,image/png` |
 
 ## Documentation
 
-- [Requirements](docs/requirements/phase1.md) - Phase 1 requirements
-- [Design Document](image-hosting-mvp-distributed-systems.md) - Architecture & distributed systems concepts
+- [TODO & Progress](TODO.md) - Current status and roadmap
+- [CLAUDE.md](CLAUDE.md) - Developer guide and patterns
+- [Requirements](docs/requirements/) - Phase requirements
 - [ADRs](docs/adr/) - Architecture decision records
-- [Development Workflow](docs/development-workflow.md) - How to contribute
+- [Deployment](docs/deployment/) - Deployment guides
+
+## Project Status
+
+- **Phase 3.5 Complete** - Supabase Auth + Production Deployed
+- **255 tests passing**
+- **Live at:** https://chitram.io
+
+See [TODO.md](TODO.md) for detailed progress.
 
 ## License
 
 MIT
+
+---
+
+**Project Name:** Chitram (చిత్రం - Image/Picture in Telugu)
