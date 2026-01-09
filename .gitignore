@@ -33,6 +33,8 @@ deploy/.env.production
 htmlcov/
 .pytest_cache/
 .mypy_cache/
+*.db
+test.db
 
 # OS
 .DS_Store
