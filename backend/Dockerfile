@@ -22,8 +22,10 @@ COPY pyproject.toml uv.lock* ./
 # Install dependencies
 RUN uv sync --frozen --no-dev 2>/dev/null || uv sync --no-dev
 
-# Copy application code
+# Copy application code and alembic migrations
 COPY app/ ./app/
+COPY alembic/ ./alembic/
+COPY alembic.ini ./
 
 # Create uploads directory for local storage fallback
 RUN mkdir -p /app/uploads
