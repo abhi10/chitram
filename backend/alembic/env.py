@@ -10,6 +10,8 @@ from app.config import get_settings
 # Import our models and Base
 from app.database import Base
 from app.models.image import Image  # noqa: F401 - Import to register model
+from app.models.tag import ImageTag, Tag  # noqa: F401 - Import to register models
+from app.models.user import User  # noqa: F401 - Import to register model
 
 # this is the Alembic Config object
 config = context.config
