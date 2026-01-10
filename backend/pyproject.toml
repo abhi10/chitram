@@ -33,6 +33,8 @@ dependencies = [
     "jinja2>=3.1.0",
     "itsdangerous>=2.2.0", # For CSRF tokens
     "supabase>=2.27.1",
+    # Database (sync driver for Alembic migrations)
+    "psycopg2-binary>=2.9.0",
 ]
 
 [project.optional-dependencies]
@@ -44,9 +46,6 @@ dev = [
     "aiosqlite>=0.20.0",
     "pillow>=11.0.0",         # For generating test images + Phase 1.5 dimensions
     "greenlet>=3.3.0",        # Required for SQLAlchemy async
-
-    # Database (dev only - for Alembic migrations)
-    "psycopg2-binary>=2.9.0", # Sync driver for Alembic
 
     # Code Quality
     "ruff>=0.8.0",
