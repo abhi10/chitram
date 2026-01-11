@@ -1,8 +1,8 @@
 # Chitram - TODO List & Progress Tracker
 
 **Repository:** https://github.com/abhi10/chitram
-**Current Phase:** Phase 3.5 Complete - Supabase Auth + Production Deployed
-**Last Updated:** 2026-01-08
+**Current Phase:** Phase 5 Complete - AI Vision Provider + Production Deployed
+**Last Updated:** 2026-01-11
 
 ---
 
@@ -16,9 +16,10 @@
 | **Phase 2B** | ✅ Complete | `main` | Thumbnails (FastAPI BackgroundTasks), 188 tests |
 | **Phase 3** | ✅ Complete | `main` | Web UI (HTMX + Jinja2), deployed 2026-01-04 |
 | **Phase 3.5** | ✅ Complete | `main` | Supabase Auth Integration, 255 tests |
-| **Phase 4** | ⏸️ Future | - | Advanced Features (Celery, Dedup) |
-| **Phase 5** | ⏸️ Future | - | Distributed Cache (Consistent Hashing) |
-| **Phase 6** | ⏸️ Future | - | Basic Observability (Prometheus)
+| **Phase 5** | ✅ Complete | `main` | AI Vision Provider (OpenAI gpt-4o-mini), 323 tests |
+| **Phase 6** | ⏸️ Next | - | Automatic AI Tagging on Upload (Celery) |
+| **Phase 7** | ⏸️ Future | - | Distributed Cache (Consistent Hashing) |
+| **Phase 8** | ⏸️ Future | - | Basic Observability (Prometheus)
 
 ---
 
@@ -604,6 +605,113 @@ user_id = auth_service.verify_token(token)  # Fails for Supabase!
 
 ---
 
+## ✅ Phase 5 - AI Vision Provider Integration (COMPLETE)
+
+**Goal:** Implement AI-powered image tagging using OpenAI Vision API
+**Status:** ✅ Complete - Deployed 2026-01-11
+**Branch:** `main` (merged from feat/phase5-ai-vision-provider)
+**Tests:** 323 passing (21 AI provider unit tests, 5 integration tests)
+**Production:** https://chitram.io
+
+> **Architecture Decision:** Strategy pattern for pluggable AI providers (OpenAI, Google, Mock) with cost control and graceful degradation.
+
+**Why This Matters:**
+- Automatic image tagging improves searchability
+- Cost-efficient (~$0.004 per image with gpt-4o-mini)
+- Production-ready with full CI/CD automation via GitHub Secrets
+- Graceful degradation when AI fails (no UX breakage)
+
+### Implementation
+- [x] **AI Provider Architecture:**
+  - [x] Create `AITaggingProvider` abstract base class
+  - [x] `MockAIProvider` for testing (no API costs)
+  - [x] `OpenAIVisionProvider` for production (gpt-4o-mini)
+  - [x] Factory function `create_ai_provider(settings)`
+  - [x] Configuration via `AI_PROVIDER` env var (mock|openai|google)
+- [x] **OpenAI Integration:**
+  - [x] Add `openai` dependency to pyproject.toml
+  - [x] Implement OpenAI Vision API client
+  - [x] Image → base64 encoding → API call → tag parsing
+  - [x] Cost control: `AI_MAX_TAGS_PER_IMAGE=5`
+  - [x] Quality filter: `AI_CONFIDENCE_THRESHOLD=70`
+- [x] **Manual Testing Endpoint (Phase 5 only):**
+  - [x] `POST /api/v1/images/{id}/ai-tag` - Temporary endpoint
+  - [x] Returns tags with confidence scores
+  - [x] Graceful error handling
+  - [x] Will be removed in Phase 6 (automatic tagging)
+- [x] **GitHub Secrets Automation:**
+  - [x] Update CD pipeline to inject 5 AI secrets
+  - [x] Add `OPENAI_API_KEY`, `AI_PROVIDER`, `AI_MAX_TAGS_PER_IMAGE`, etc.
+  - [x] Zero manual SSH steps for configuration
+  - [x] Docker Compose environment variable setup
+- [x] **Testing:**
+  - [x] 21 unit tests for AI providers
+  - [x] 5 integration tests (manual - requires API key)
+  - [x] Production testing with 3 diverse images
+  - [x] All tests passing (integration tests auto-skip in CI)
+- [x] **Documentation:**
+  - [x] Phase 5 implementation plan
+  - [x] Phase 5 implementation summary
+  - [x] OpenAI Vision success confirmation
+  - [x] Comprehensive retrospective with architecture diagrams
+  - [x] ML background: How image captioning works
+  - [x] GitHub Secrets setup guide
+
+### Test Results (Production)
+
+**3 images tested, all successful:**
+
+1. **Tropical Palm Garden**
+   - Tags: palms, tropical, greenery, blue sky, lush
+   - Confidence: 90% each
+   - Cost: ~$0.004
+
+2. **Floral Arrangement**
+   - Tags: flowers, bouquet, home decor, floral arrangement, pastel colors
+   - Confidence: 90% each
+   - Cost: ~$0.004
+
+3. **Programming Workspace**
+   - Tags: books, study area, desk organization, computer science, programming
+   - Confidence: 90% each
+   - Cost: ~$0.004
+
+**Success Rate:** 100% (3/3)
+**Total Cost:** ~$0.012
+
+### Key Pattern: AI Provider Strategy
+
+```python
+# Usage in code
+from app.services.ai import create_ai_provider
+
+ai_provider = create_ai_provider(settings)
+tags = await ai_provider.analyze_image(image_bytes)
+# Returns: [AITag(name="palms", confidence=90, category=None), ...]
+```
+
+### Issues Resolved During Deployment
+
+**Issue 1:** Empty GitHub Secret (AI_PROVIDER)
+- **Fix:** Set value to "openai" in GitHub UI
+
+**Issue 2:** Containers not restarting
+- **Fix:** Added `docker compose down` before `up` in CD pipeline
+
+**Issue 3:** Docker Compose missing AI environment variables (ROOT CAUSE)
+- **Fix:** Added all 5 AI vars to docker-compose.yml services.app.environment
+- **Commit:** 37e3709 (THE FIX THAT MADE IT WORK)
+
+### Related Documentation
+- [Phase 5 Comprehensive Analysis](docs/implementation/phase5-comprehensive-analysis.md) - Full retrospective with architecture, data flow, debugging timeline
+- [OpenAI Vision Success](docs/implementation/phase5-openai-vision-success.md) - Test results and validation
+- [GitHub Secrets Setup](docs/deployment/GITHUB_SECRETS_SETUP.md) - Configuration guide
+
+**Related PRs:**
+- [PR #57](https://github.com/abhi10/chitram/pull/57) - Phase 5 AI Vision Provider implementation
+
+---
+
 ## 🔧 Phase 4 - Advanced Features (FUTURE)
 
 **Goal:** Add advanced backend features deferred from earlier phases
@@ -666,7 +774,7 @@ user_id = auth_service.verify_token(token)  # Fails for Supabase!
 
 ---
 
-## 🚀 Phase 5 - Distributed Cache (FUTURE)
+## 🚀 Phase 7 - Distributed Cache (FUTURE)
 
 **Goal:** Learn distributed systems through hands-on cache implementation
 **Status:** ⏸️ Not started
@@ -732,7 +840,7 @@ The following items were removed from MVP scope:
 
 ---
 
-## 📊 Phase 6 - Basic Observability (FUTURE)
+## 📊 Phase 8 - Basic Observability (FUTURE)
 
 **Goal:** Add metrics to visualize cache behavior and API performance
 **Status:** ⏸️ Not started
@@ -936,27 +1044,36 @@ git push origin --delete feature/phase-X.X
 
 ## 🎯 Current Focus
 
-**Current State:** Phase 3.5 Complete - Production deployed at https://chitram.io
+**Current State:** Phase 5 Complete - AI Vision Provider deployed at https://chitram.io
 
 **Recently Completed:**
+- ✅ **Phase 5: AI Vision Provider (2026-01-11)**
+  - OpenAI Vision API integration (gpt-4o-mini)
+  - 323 tests passing (21 AI unit tests, 5 integration tests)
+  - GitHub Secrets automation for AI configuration
+  - Manual testing endpoint: `POST /api/v1/images/{id}/ai-tag`
+  - 3 production tests: 100% success rate, 90% confidence tags
+  - Cost: ~$0.004 per image
 - ✅ Supabase Auth Integration (Phase 3.5)
 - ✅ FR-4.1 Security Fix - Private galleries
 - ✅ Web UI with HTMX (Phase 3)
 - ✅ CD Pipeline with GitHub Actions
 - ✅ Production deployment on DigitalOcean
-- ✅ Descoped Phase 5/6 for MVP focus
 
-**Up Next (Phase 5 - Distributed Cache):**
-- [ ] Implement consistent hashing ring algorithm
-- [ ] Create distributed cache service with multi-node support
-- [ ] Add integration tests with 3 Redis instances
+**Up Next (Phase 6 - Automatic AI Tagging):**
+- [ ] Background job queue with Celery + Redis
+- [ ] Automatic AI tagging on image upload
+- [ ] Retry logic for failed API calls (3 attempts, exponential backoff)
+- [ ] Remove temporary manual testing endpoint
+- [ ] Automatic provider fallback (OpenAI → Google → Mock)
 
-> **Note:** Phase 5 can be done independently of Phase 4. Phase 4 (Celery, Dedup) is optional and can be skipped.
+> **Note:** Phase 4 (Advanced Features - Checksum, Deduplication) is optional and can be skipped.
 
 **Production Status:**
 - 🌐 Live at: https://chitram.io
 - 🔒 Auth: Supabase (production) / Local JWT (tests)
-- 📊 Tests: 255 passing
+- 🤖 AI Tagging: OpenAI Vision API (gpt-4o-mini)
+- 📊 Tests: 323 passing
 - 🚀 CD: Auto-deploy on merge to main
 
 ---
@@ -972,9 +1089,11 @@ Phase 2A Auth   ✅ Complete (151 tests, 2026-01-03)
 Phase 2B        ✅ Complete (188 tests, 2026-01-03)
 Phase 3         ✅ Complete (Web UI deployed 2026-01-04)
 Phase 3.5       ✅ Complete (Supabase Auth, 255 tests, 2026-01-08)
-Phase 4         ⏸️ Future - Advanced Features (Celery, Dedup) [Optional]
-Phase 5         ⏸️ Future - Distributed Cache (Consistent Hashing) ← Next
-Phase 6         ⏸️ Future - Basic Observability (Prometheus)
+Phase 5         ✅ Complete (AI Vision Provider, 323 tests, 2026-01-11)
+Phase 6         ⏸️ Next - Automatic AI Tagging (Celery background jobs)
+Phase 4         ⏸️ Future - Advanced Features (Checksum, Dedup) [Optional]
+Phase 7         ⏸️ Future - Distributed Cache (Consistent Hashing)
+Phase 8         ⏸️ Future - Basic Observability (Prometheus)
 ```
 
 **Current Status:** 🟢 Production deployed

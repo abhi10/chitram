@@ -8,10 +8,11 @@
 - pytest for testing
 
 ## Current Status
-- **Current Phase:** Phase 3.5 deployed to production (https://chitram.io)
-- **Tests:** 229 passing
+- **Current Phase:** Phase 5 deployed to production (https://chitram.io)
+- **Tests:** 323 passing (21 AI provider unit tests, 5 integration tests)
 - **Production:** DigitalOcean droplet with Docker Compose, Caddy, PostgreSQL, MinIO, Redis
 - **Auth:** Supabase authentication with pluggable provider pattern
+- **AI Tagging:** OpenAI Vision API (gpt-4o-mini) for image auto-tagging
 
 ## Key Decisions
 - Using GitHub Codespaces for development (ADR-0007)
