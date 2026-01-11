@@ -477,18 +477,23 @@ async def generate_ai_tags(
 
     image_bytes, _, _ = result
 
-    # 4. Call AI provider
+    # 4. Call AI provider (with graceful degradation)
     try:
         ai_provider = create_ai_provider(settings)
         tags = await ai_provider.analyze_image(image_bytes)
     except AIProviderError as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=ErrorDetail(
-                code="AI_PROVIDER_ERROR",
-                message=f"AI provider failed: {str(e)}",
-            ).model_dump(),
-        ) from e
+        # Graceful degradation: Don't break UX when AI fails
+        # This is especially important for quota errors, API downtime, etc.
+        print(f"AI provider failed for image {image_id}: {e}")
+        return {
+            "message": "Image is ready, but AI tagging is temporarily unavailable",
+            "image_id": image_id,
+            "tags": [],
+            "provider": settings.ai_provider,
+            "model": settings.openai_vision_model if settings.ai_provider == "openai" else None,
+            "error": str(e),
+            "suggestion": "Try again later or switch to mock provider (AI_PROVIDER=mock)",
+        }
 
     # 5. Save tags to database
     tag_service = TagService(db=db)
