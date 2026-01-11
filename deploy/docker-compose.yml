@@ -69,6 +69,13 @@ services:
       SUPABASE_URL: ${SUPABASE_URL:-}
       SUPABASE_ANON_KEY: ${SUPABASE_ANON_KEY:-}
 
+      # AI Tagging (Phase 5)
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MAX_TAGS_PER_IMAGE: ${AI_MAX_TAGS_PER_IMAGE:-5}
+      AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-70}
+      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-4o-mini}
+
       # App Settings
       DEBUG: ${DEBUG:-false}
     depends_on:
