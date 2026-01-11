@@ -5,10 +5,10 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import require_current_user
+from app.api.dependencies import verify_image_ownership
 from app.database import get_db
-from app.models.user import User
-from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
+from app.models.image import Image
+from app.schemas.error import ErrorDetail, ErrorResponse
 from app.schemas.tag import AddTagRequest, ImageTagResponse, TagResponse, TagWithCount
 from app.services.tag_service import TagService
 
@@ -52,11 +52,9 @@ async def get_image_tags(
     },
 )
 async def add_tag_to_image(
-    image_id: str,
     request: AddTagRequest,
     service: TagService = Depends(get_tag_service),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_current_user),
+    image: Image = Depends(verify_image_ownership),
 ) -> ImageTagResponse:
     """
     Add a tag to an image.
@@ -64,37 +62,10 @@ async def add_tag_to_image(
     Requires authentication. User must own the image.
     Creates tag if it doesn't exist. Tag names are automatically normalized (lowercase, trimmed).
     """
-    # Check if image exists and user owns it
-    from sqlalchemy import select
-
-    from app.models.image import Image
-
-    result = await db.execute(select(Image).where(Image.id == image_id))
-    image = result.scalar_one_or_none()
-
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message=f"Image with ID '{image_id}' not found",
-            ).model_dump(),
-        )
-
-    # Check ownership
-    if image.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ErrorDetail(
-                code="FORBIDDEN",
-                message="You do not own this image",
-            ).model_dump(),
-        )
-
-    # Add tag to image
+    # Add tag to image (ownership already verified by dependency)
     try:
         await service.add_tag_to_image(
-            image_id=image_id,
+            image_id=image.id,
             tag_name=request.tag,
             source="user",
             confidence=None,
@@ -110,7 +81,7 @@ async def add_tag_to_image(
         ) from e
 
     # Return response matching ImageTagResponse schema
-    tags = await service.get_image_tags(image_id)
+    tags = await service.get_image_tags(image.id)
     # Find the tag we just added
     for tag in tags:
         if tag.name == request.tag.lower().strip():
@@ -136,11 +107,9 @@ async def add_tag_to_image(
     },
 )
 async def remove_tag_from_image(
-    image_id: str,
     tag_name: str,
     service: TagService = Depends(get_tag_service),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_current_user),
+    image: Image = Depends(verify_image_ownership),
 ) -> None:
     """
     Remove a tag from an image.
@@ -148,35 +117,8 @@ async def remove_tag_from_image(
     Requires authentication. User must own the image.
     Tag name is case-insensitive.
     """
-    # Check if image exists and user owns it
-    from sqlalchemy import select
-
-    from app.models.image import Image
-
-    result = await db.execute(select(Image).where(Image.id == image_id))
-    image = result.scalar_one_or_none()
-
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message=f"Image with ID '{image_id}' not found",
-            ).model_dump(),
-        )
-
-    # Check ownership
-    if image.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ErrorDetail(
-                code="FORBIDDEN",
-                message="You do not own this image",
-            ).model_dump(),
-        )
-
-    # Remove tag
-    success = await service.remove_tag_from_image(image_id, tag_name)
+    # Remove tag (ownership already verified by dependency)
+    success = await service.remove_tag_from_image(image.id, tag_name)
 
     if not success:
         raise HTTPException(
