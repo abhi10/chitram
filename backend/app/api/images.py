@@ -42,9 +42,9 @@ def get_storage(request: Request) -> StorageService:
     return request.app.state.storage
 
 
-def get_thumbnail_service(request: Request) -> ThumbnailService:
+def get_thumbnail_service(request: Request) -> ThumbnailService | None:
     """Dependency to get thumbnail service from app state."""
-    return request.app.state.thumbnail_service
+    return getattr(request.app.state, "thumbnail_service", None)
 
 
 def get_image_service(
@@ -111,7 +111,7 @@ async def upload_image(
     background_tasks: BackgroundTasks,
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
-    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
+    thumbnail_service: ThumbnailService | None = Depends(get_thumbnail_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
     current_user: User = Depends(require_current_user),
 ) -> ImageUploadResponse:
@@ -170,10 +170,12 @@ async def upload_image(
         )
 
         # Queue thumbnail generation as background task (Phase 2B)
-        background_tasks.add_task(
-            thumbnail_service.generate_and_store_thumbnail,
-            image.id,
-        )
+        # Skip if thumbnail service is unavailable (graceful degradation)
+        if thumbnail_service:
+            background_tasks.add_task(
+                thumbnail_service.generate_and_store_thumbnail,
+                image.id,
+            )
 
         # Build response (delete_token only for anonymous uploads)
         # thumbnail_ready=False since background task hasn't run yet
@@ -287,7 +289,7 @@ async def download_image(
 async def get_thumbnail(
     image_id: str,
     service: ImageService = Depends(get_image_service),
-    thumbnail_service: ThumbnailService = Depends(get_thumbnail_service),
+    thumbnail_service: ThumbnailService | None = Depends(get_thumbnail_service),
 ) -> Response:
     """
     Get thumbnail for an image.
@@ -295,7 +297,18 @@ async def get_thumbnail(
     Returns the 300px thumbnail if available.
     Returns 404 with THUMBNAIL_NOT_READY if thumbnail hasn't been generated yet.
     Returns 404 with IMAGE_NOT_FOUND if image doesn't exist.
+    Returns 503 with SERVICE_UNAVAILABLE if thumbnail service is unavailable.
     """
+    # Check if thumbnail service is available (graceful degradation)
+    if not thumbnail_service:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=ErrorDetail(
+                code=ErrorCodes.SERVICE_UNAVAILABLE,
+                message="Thumbnail service is currently unavailable.",
+            ).model_dump(),
+        )
+
     # First check if image exists using the injected service
     image = await service.get_by_id(image_id)
 
