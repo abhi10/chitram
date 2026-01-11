@@ -76,7 +76,7 @@ class Settings(BaseSettings):
     # AI Tagging Configuration (Phase 5)
     ai_provider: str = "mock"  # "openai", "google", "mock"
     ai_confidence_threshold: int = 70  # Filter tags below this confidence
-    ai_max_tags_per_image: int = 10  # Cost control: limit tags per image
+    ai_max_tags_per_image: int = 5  # Cost control: limit tags per image
 
     # OpenAI Vision settings (used when ai_provider = "openai")
     openai_api_key: str | None = None
