@@ -17,6 +17,7 @@ from sqlalchemy.exc import TimeoutError as SQLAlchemyTimeoutError
 from app.api.auth import router as auth_router
 from app.api.health import router as health_router
 from app.api.images import router as images_router
+from app.api.tags import router as tags_router
 from app.api.web import router as web_router
 from app.config import get_settings
 from app.database import async_session_maker, close_db, init_db
@@ -217,4 +218,5 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "static")), name="stat
 app.include_router(health_router)
 app.include_router(auth_router)
 app.include_router(images_router, prefix="/api/v1")
+app.include_router(tags_router, prefix="/api/v1")
 app.include_router(web_router)  # Web UI routes (no prefix, serves at /)

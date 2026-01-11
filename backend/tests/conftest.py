@@ -86,6 +86,12 @@ def sample_png_bytes() -> bytes:
 
 
 @pytest.fixture
+def sample_image_bytes(sample_jpeg_bytes: bytes) -> bytes:
+    """Alias for sample_jpeg_bytes for convenience."""
+    return sample_jpeg_bytes
+
+
+@pytest.fixture
 def large_image_bytes() -> bytes:
     """Create an image larger than 5MB limit."""
     img = PILImage.new("RGB", (2000, 2000), color="green")
@@ -257,3 +263,25 @@ async def auth_token(test_deps: TestDependencies, test_user: User) -> str:
 async def auth_headers(auth_token: str) -> dict[str, str]:
     """Return authorization headers for authenticated requests."""
     return {"Authorization": f"Bearer {auth_token}"}
+
+
+@pytest.fixture
+async def other_user(test_deps: TestDependencies) -> User:
+    """Create a second test user for testing ownership/authorization."""
+    auth_service = AuthService(test_deps.session)
+    user = await auth_service.create_user("other@example.com", "otherpassword123")
+    await test_deps.session.commit()
+    return user
+
+
+@pytest.fixture
+async def other_user_auth_token(test_deps: TestDependencies, other_user: User) -> str:
+    """Generate auth token for second test user."""
+    auth_service = AuthService(test_deps.session)
+    return auth_service.create_access_token(other_user.id)
+
+
+@pytest.fixture
+async def other_user_auth_headers(other_user_auth_token: str) -> dict[str, str]:
+    """Return authorization headers for second test user."""
+    return {"Authorization": f"Bearer {other_user_auth_token}"}

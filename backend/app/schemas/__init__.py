@@ -2,6 +2,13 @@
 from app.schemas.auth import AuthResponse, Token, UserLogin, UserRegister, UserResponse
 from app.schemas.error import ErrorDetail, ErrorResponse
 from app.schemas.image import ImageCreate, ImageMetadata, ImageResponse
+from app.schemas.tag import (
+    AddTagRequest,
+    ImageTagResponse,
+    TagCreate,
+    TagResponse,
+    TagWithCount,
+)
 
 __all__ = [
     "ImageCreate",
@@ -14,4 +21,9 @@ __all__ = [
     "Token",
     "UserResponse",
     "AuthResponse",
+    "TagCreate",
+    "TagResponse",
+    "ImageTagResponse",
+    "AddTagRequest",
+    "TagWithCount",
 ]
