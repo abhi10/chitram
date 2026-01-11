@@ -73,6 +73,22 @@ class Settings(BaseSettings):
     supabase_url: str | None = None
     supabase_anon_key: str | None = None
 
+    # AI Tagging Configuration (Phase 5)
+    ai_provider: str = "mock"  # "openai", "google", "mock"
+    ai_confidence_threshold: int = 70  # Filter tags below this confidence
+    ai_max_tags_per_image: int = 5  # Cost control: limit tags per image
+
+    # OpenAI Vision settings (used when ai_provider = "openai")
+    openai_api_key: str | None = None
+    openai_vision_model: str = "gpt-4o-mini"  # Cost-efficient model (~$0.004/image)
+    openai_vision_prompt: str = (
+        "Generate 10 descriptive tags for this image. "
+        "Return only tag names separated by commas, no explanations."
+    )
+
+    # Google Cloud Vision settings (used when ai_provider = "google")
+    google_vision_api_key: str | None = None
+
     @property
     def max_file_size_bytes(self) -> int:
         """Max file size in bytes."""
