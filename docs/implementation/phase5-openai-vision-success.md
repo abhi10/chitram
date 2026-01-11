@@ -205,7 +205,46 @@ All tags returned with **90% confidence**:
 
 **Proves:** OpenAI Vision works consistently across diverse image types!
 
-**Cost for 2 tests:** ~$0.008 total (~$0.004 each)
+### Test 3: Study/Programming Workspace
+
+**Image ID:** d50779cf-8068-4ab7-bc03-9bee659f577c
+**View URL:** https://chitram.io/image/d50779cf-8068-4ab7-bc03-9bee659f577c
+
+**OpenAI Vision Tags (All 90% confidence):**
+
+1. **books** - Identified books in the scene
+2. **study area** - Recognized as study/work environment
+3. **desk organization** - Detected organized workspace
+4. **computer science** - Inferred topic from visual context
+5. **programming** - Understood subject matter
+
+**API Response:**
+```json
+{
+  "message": "Added 5 AI tags to image",
+  "image_id": "d50779cf-8068-4ab7-bc03-9bee659f577c",
+  "tags": [
+    {"name": "books", "confidence": 90, "category": null},
+    {"name": "study area", "confidence": 90, "category": null},
+    {"name": "desk organization", "confidence": 90, "category": null},
+    {"name": "computer science", "confidence": 90, "category": null},
+    {"name": "programming", "confidence": 90, "category": null}
+  ],
+  "provider": "openai",
+  "model": "gpt-4o-mini"
+}
+```
+
+**Analysis:**
+- ✅ Third distinct category: outdoor nature → indoor decor → workspace/study
+- ✅ Detected physical objects (books)
+- ✅ Understood context and purpose (study area)
+- ✅ Inferred subject matter from visual cues (computer science, programming)
+- ✅ Recognized organizational aspect (desk organization)
+
+**Notable:** This was the image that initially returned **0 tags** when using mock provider, confirming the transition from mock → OpenAI is working correctly!
+
+**Cost for 3 tests:** ~$0.012 total (~$0.004 each)
 
 ---
 
