@@ -289,6 +289,8 @@ jobs:
             cd "$DEPLOY_DIR/deploy"
             sudo docker compose --env-file .env.production pull || true
             sudo docker compose --env-file .env.production build
+            # Force restart to pick up new environment variables
+            sudo docker compose --env-file .env.production down
             sudo docker compose --env-file .env.production up -d
 
             # Wait for health check (port 80 via Caddy, not 8000)
