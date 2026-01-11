@@ -204,11 +204,15 @@ jobs:
         uses: appleboy/ssh-action@v1.0.3
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
+          AI_MAX_TAGS_PER_IMAGE: ${{ secrets.AI_MAX_TAGS_PER_IMAGE }}
+          AI_CONFIDENCE_THRESHOLD: ${{ secrets.AI_CONFIDENCE_THRESHOLD }}
+          OPENAI_VISION_MODEL: ${{ secrets.OPENAI_VISION_MODEL }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
-          envs: OPENAI_API_KEY
+          envs: OPENAI_API_KEY,AI_PROVIDER,AI_MAX_TAGS_PER_IMAGE,AI_CONFIDENCE_THRESHOLD,OPENAI_VISION_MODEL
           script: |
             set -e
 
@@ -237,16 +241,44 @@ jobs:
             fi
 
             # Inject GitHub Secrets into .env.production
-            echo "Injecting secrets from GitHub..."
+            echo "Injecting AI configuration from GitHub Secrets..."
+
+            # Remove old AI configuration lines if they exist
+            sudo sed -i '/^OPENAI_API_KEY=/d' "$DEPLOY_DIR/deploy/.env.production"
+            sudo sed -i '/^AI_PROVIDER=/d' "$DEPLOY_DIR/deploy/.env.production"
+            sudo sed -i '/^AI_MAX_TAGS_PER_IMAGE=/d' "$DEPLOY_DIR/deploy/.env.production"
+            sudo sed -i '/^AI_CONFIDENCE_THRESHOLD=/d' "$DEPLOY_DIR/deploy/.env.production"
+            sudo sed -i '/^OPENAI_VISION_MODEL=/d' "$DEPLOY_DIR/deploy/.env.production"
+
+            # Inject OPENAI_API_KEY (required)
             if [ -n "$OPENAI_API_KEY" ]; then
-              # Remove old OPENAI_API_KEY line if exists
-              sudo sed -i '/^OPENAI_API_KEY=/d' "$DEPLOY_DIR/deploy/.env.production"
-              # Add new OPENAI_API_KEY
               echo "OPENAI_API_KEY=$OPENAI_API_KEY" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
-              echo "✓ OPENAI_API_KEY injected successfully"
+              echo "✓ OPENAI_API_KEY injected"
             else
               echo "⚠️  WARNING: OPENAI_API_KEY not found in GitHub Secrets"
             fi
+
+            # Inject AI_PROVIDER (defaults to 'mock' if not set)
+            AI_PROVIDER_VALUE="${AI_PROVIDER:-mock}"
+            echo "AI_PROVIDER=$AI_PROVIDER_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+            echo "✓ AI_PROVIDER=$AI_PROVIDER_VALUE"
+
+            # Inject AI_MAX_TAGS_PER_IMAGE (defaults to 5)
+            AI_MAX_TAGS_VALUE="${AI_MAX_TAGS_PER_IMAGE:-5}"
+            echo "AI_MAX_TAGS_PER_IMAGE=$AI_MAX_TAGS_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+            echo "✓ AI_MAX_TAGS_PER_IMAGE=$AI_MAX_TAGS_VALUE"
+
+            # Inject AI_CONFIDENCE_THRESHOLD (defaults to 70)
+            AI_CONFIDENCE_VALUE="${AI_CONFIDENCE_THRESHOLD:-70}"
+            echo "AI_CONFIDENCE_THRESHOLD=$AI_CONFIDENCE_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+            echo "✓ AI_CONFIDENCE_THRESHOLD=$AI_CONFIDENCE_VALUE"
+
+            # Inject OPENAI_VISION_MODEL (defaults to gpt-4o-mini)
+            OPENAI_MODEL_VALUE="${OPENAI_VISION_MODEL:-gpt-4o-mini}"
+            echo "OPENAI_VISION_MODEL=$OPENAI_MODEL_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+            echo "✓ OPENAI_VISION_MODEL=$OPENAI_MODEL_VALUE"
+
+            echo "✓ All AI configuration injected successfully"
 
             # Deploy with docker compose
             echo "Starting services..."

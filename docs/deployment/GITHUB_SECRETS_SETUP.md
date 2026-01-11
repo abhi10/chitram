@@ -74,77 +74,70 @@
 - 1,000 images/month = $4
 - 5,000 images/month = $20
 
-### Step 2: Add Secret to GitHub Repository
+### Step 2: Add Secrets to GitHub Repository
 
 1. **Navigate to Repository Settings:**
    ```
    https://github.com/YOUR-USERNAME/chitram/settings/secrets/actions
    ```
 
-2. **Add New Secret:**
-   - Click **"New repository secret"**
-   - **Name:** `OPENAI_API_KEY` (must match exactly)
-   - **Value:** Paste your OpenAI key (sk-proj-...)
-   - Click **"Add secret"**
+2. **Add ALL AI Configuration Secrets:**
 
-3. **Verify Secret Added:**
-   - You should see `OPENAI_API_KEY` in the list
-   - Value will show as `***` (encrypted)
-   - Updated timestamp shows when added
+   Click **"New repository secret"** for each of these:
 
-**Screenshot:**
-```
-Repository secrets
+   | Secret Name | Value | Required? |
+   |-------------|-------|-----------|
+   | `OPENAI_API_KEY` | `sk-proj-your-key-here` | ✅ YES (your actual OpenAI key) |
+   | `AI_PROVIDER` | `openai` | ✅ YES (or `mock` for testing) |
+   | `AI_MAX_TAGS_PER_IMAGE` | `5` | Optional (defaults to 5) |
+   | `AI_CONFIDENCE_THRESHOLD` | `70` | Optional (defaults to 70) |
+   | `OPENAI_VISION_MODEL` | `gpt-4o-mini` | Optional (defaults to gpt-4o-mini) |
 
-Secrets are encrypted and can only be accessed by GitHub Actions.
+   **Important:** Secret names are case-sensitive and must match exactly!
 
-OPENAI_API_KEY          Updated 3 minutes ago          [Update] [Remove]
-DROPLET_HOST            Updated 7 days ago             [Update] [Remove]
-DROPLET_USER            Updated 7 days ago             [Update] [Remove]
-DROPLET_SSH_KEY         Updated 7 days ago             [Update] [Remove]
-```
+3. **Verify All Secrets Added:**
 
-### Step 3: Update Production .env.production (One-Time)
+   You should see all 5 AI secrets in the list:
 
-**SSH to your droplet:**
+   ```
+   Repository secrets
 
-```bash
-ssh root@your-droplet-ip
-```
+   Secrets are encrypted and can only be accessed by GitHub Actions.
 
-**Edit .env.production to add AI provider settings:**
+   OPENAI_API_KEY              Updated 3 minutes ago    [Update] [Remove]
+   AI_PROVIDER                 Updated 3 minutes ago    [Update] [Remove]
+   AI_MAX_TAGS_PER_IMAGE       Updated 3 minutes ago    [Update] [Remove]
+   AI_CONFIDENCE_THRESHOLD     Updated 3 minutes ago    [Update] [Remove]
+   OPENAI_VISION_MODEL         Updated 3 minutes ago    [Update] [Remove]
+   DROPLET_HOST                Updated 7 days ago       [Update] [Remove]
+   DROPLET_USER                Updated 7 days ago       [Update] [Remove]
+   DROPLET_SSH_KEY             Updated 7 days ago       [Update] [Remove]
+   ```
 
-```bash
-cd /opt/chitram/deploy
-nano .env.production
-```
+   **Note:** If you skip the optional secrets, the CD pipeline will use default values.
 
-**Add these lines to the end:**
+### Step 3: Deploy (Fully Automated - No Manual Steps!)
 
-```bash
-# =============================================================================
-# AI PROVIDER (Phase 5 - Auto-Tagging)
-# =============================================================================
+**That's it! No manual SSH needed.**
 
-# AI Provider: "mock" (free), "openai" (paid)
-AI_PROVIDER=openai
+The CD pipeline will automatically inject ALL AI configuration from GitHub Secrets when you deploy.
 
-# OpenAI API Key - injected by CD pipeline from GitHub Secrets
-# DO NOT SET THIS MANUALLY - it will be overwritten on next deployment
-# OPENAI_API_KEY=WILL_BE_INJECTED_BY_CD_PIPELINE
+**What happens during deployment:**
 
-# AI Provider Settings
-AI_MAX_TAGS_PER_IMAGE=5
-AI_CONFIDENCE_THRESHOLD=70
-OPENAI_VISION_MODEL=gpt-4o-mini
-```
+1. CD pipeline reads secrets from GitHub
+2. Deploys code to droplet
+3. **Automatically injects into .env.production:**
+   ```bash
+   OPENAI_API_KEY=sk-proj-... (from GitHub Secret)
+   AI_PROVIDER=openai (from GitHub Secret)
+   AI_MAX_TAGS_PER_IMAGE=5 (from GitHub Secret or default)
+   AI_CONFIDENCE_THRESHOLD=70 (from GitHub Secret or default)
+   OPENAI_VISION_MODEL=gpt-4o-mini (from GitHub Secret or default)
+   ```
+4. Restarts backend container with new config
+5. ✅ Done!
 
-**Save and exit:**
-- Press `Ctrl+X`
-- Press `Y` to confirm
-- Press `Enter`
-
-**Note:** Don't manually add `OPENAI_API_KEY=...` to .env.production. The CD pipeline will inject it automatically from GitHub Secrets on every deployment.
+**No manual editing of .env.production required!**
 
 ### Step 4: Deploy to Production
 
@@ -191,18 +184,21 @@ git push origin feat/phase5-ai-vision-provider
 ```bash
 ssh root@your-droplet-ip
 
-# 1. Check .env.production has the key (should see OPENAI_API_KEY=sk-proj-...)
+# 1. Check .env.production has ALL AI config (injected by CD pipeline)
 cd /opt/chitram/deploy
-grep OPENAI_API_KEY .env.production
+grep -E "^(OPENAI_API_KEY|AI_PROVIDER|AI_MAX_TAGS|AI_CONFIDENCE|OPENAI_VISION_MODEL)=" .env.production
 
-# Should output:
+# Should output all 5 values:
 # OPENAI_API_KEY=sk-proj-YOUR-KEY-HERE
+# AI_PROVIDER=openai
+# AI_MAX_TAGS_PER_IMAGE=5
+# AI_CONFIDENCE_THRESHOLD=70
+# OPENAI_VISION_MODEL=gpt-4o-mini
 
-# 2. Check backend container has the env var
-docker-compose exec backend env | grep OPENAI_API_KEY
+# 2. Check backend container has the env vars
+docker-compose exec backend env | grep -E "^(OPENAI_API_KEY|AI_PROVIDER|AI_MAX_TAGS|AI_CONFIDENCE|OPENAI_VISION_MODEL)="
 
-# Should output:
-# OPENAI_API_KEY=sk-proj-YOUR-KEY-HERE
+# Should output all 5 values from container
 
 # 3. Check backend logs for AI provider initialization
 docker-compose logs backend | grep -i "openai"
