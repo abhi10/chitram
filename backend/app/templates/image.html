@@ -55,6 +55,52 @@
             -webkit-backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+
+        /* Tag styles */
+        .tag {
+            transition: all 0.2s ease;
+        }
+        .tag-user {
+            background: rgba(196, 149, 106, 0.2); /* terracotta */
+            color: #D4A574;
+            border: 1px solid rgba(212, 165, 116, 0.3);
+        }
+        .tag-ai {
+            background: rgba(59, 130, 246, 0.2); /* blue */
+            color: #93C5FD;
+            border: 1px solid rgba(147, 197, 253, 0.3);
+        }
+        .tag:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+
+        /* Autocomplete suggestions */
+        #tag-suggestions {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(255, 255, 255, 0.3) rgba(255, 255, 255, 0.1);
+        }
+        #tag-suggestions::-webkit-scrollbar {
+            width: 6px;
+        }
+        #tag-suggestions::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 3px;
+        }
+        #tag-suggestions::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 3px;
+        }
+        .suggestion-item {
+            padding: 0.5rem 0.75rem;
+            cursor: pointer;
+            transition: background 0.15s ease;
+            color: rgba(255, 255, 255, 0.8);
+        }
+        .suggestion-item:hover {
+            background: rgba(196, 149, 106, 0.2);
+            color: #D4A574;
+        }
     </style>
 </head>
 <body class="bg-gray-900 min-h-screen">
@@ -107,6 +153,78 @@
                         <span class="text-white/60">Uploaded</span>
                         <span>{{ image.created_at.strftime('%B %d, %Y') }}</span>
                     </div>
+                </div>
+
+                <!-- Divider -->
+                <hr class="border-white/20 my-4">
+
+                <!-- Tags Section -->
+                <div class="tags-section">
+                    <h3 class="text-white font-semibold mb-3 flex items-center">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z"/>
+                        </svg>
+                        Tags
+                    </h3>
+
+                    <!-- Existing Tags -->
+                    <div class="tag-list flex flex-wrap gap-2 mb-3" id="tag-list">
+                        {% if tags %}
+                            {% for tag in tags %}
+                            <span class="tag tag-{{ tag.source }} inline-flex items-center px-3 py-1 rounded-full text-sm font-medium">
+                                <span class="tag-icon mr-1.5">{% if tag.source == 'ai' %}✨{% else %}👤{% endif %}</span>
+                                <span class="tag-name">{{ tag.name }}</span>
+                                {% if tag.confidence %}
+                                <span class="tag-confidence ml-1 text-xs opacity-75">({{ tag.confidence }}%)</span>
+                                {% endif %}
+                                {% if is_owner %}
+                                <button
+                                    onclick="removeTag('{{ tag.name }}')"
+                                    class="ml-2 text-white/60 hover:text-white transition-colors"
+                                    title="Remove tag"
+                                >
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                                {% endif %}
+                            </span>
+                            {% endfor %}
+                        {% else %}
+                            <p class="text-white/40 text-sm">No tags yet</p>
+                        {% endif %}
+                    </div>
+
+                    <!-- Add Tag Input (Owner Only) -->
+                    {% if is_owner %}
+                    <div class="add-tag relative">
+                        <div class="flex space-x-2">
+                            <div class="flex-1 relative">
+                                <input
+                                    type="text"
+                                    id="new-tag"
+                                    placeholder="Add a tag..."
+                                    autocomplete="off"
+                                    class="w-full bg-white/10 text-white placeholder-white/40 px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-terracotta-400 transition-all"
+                                    oninput="onTagInput()"
+                                    onkeydown="onTagKeydown(event)"
+                                >
+                                <!-- Autocomplete suggestions -->
+                                <div id="tag-suggestions" class="hidden absolute z-10 w-full mt-1 bg-gray-800 border border-white/20 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                                    <!-- Suggestions populated by JavaScript -->
+                                </div>
+                            </div>
+                            <button
+                                onclick="addTag()"
+                                class="bg-terracotta-500 hover:bg-terracotta-600 text-white px-4 py-2 rounded-lg font-medium transition-colors whitespace-nowrap"
+                                id="add-tag-btn"
+                            >
+                                Add
+                            </button>
+                        </div>
+                        <p class="text-white/40 text-xs mt-1">Press Enter to add tag</p>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <!-- Divider -->
@@ -248,6 +366,240 @@
         document.getElementById('delete-modal').addEventListener('click', (e) => {
             if (e.target.id === 'delete-modal') {
                 closeModal();
+            }
+        });
+
+        // =====================================================================
+        // Tag Management Functions
+        // =====================================================================
+
+        const imageId = '{{ image.id }}';
+        let suggestionIndex = -1;
+        let suggestions = [];
+
+        // Get auth token from cookie
+        function getAuthToken() {
+            return document.cookie
+                .split('; ')
+                .find(row => row.startsWith('chitram_auth='))
+                ?.split('=')[1];
+        }
+
+        // Add tag to image
+        async function addTag() {
+            const tagInput = document.getElementById('new-tag');
+            const tagName = tagInput.value.trim().toLowerCase();
+
+            if (!tagName) {
+                return;
+            }
+
+            if (tagName.length < 2 || tagName.length > 50) {
+                alert('Tag must be between 2 and 50 characters');
+                return;
+            }
+
+            const btn = document.getElementById('add-tag-btn');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            try {
+                const authToken = getAuthToken();
+                const headers = {
+                    'Content-Type': 'application/json'
+                };
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch(`/api/v1/images/${imageId}/tags`, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify({ tag: tagName })
+                });
+
+                if (response.ok) {
+                    // Reload to show new tag
+                    location.reload();
+                } else {
+                    const data = await response.json();
+                    alert(data.detail?.message || 'Failed to add tag');
+                    btn.disabled = false;
+                    btn.textContent = 'Add';
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+                btn.disabled = false;
+                btn.textContent = 'Add';
+            }
+        }
+
+        // Remove tag from image
+        async function removeTag(tagName) {
+            if (!confirm(`Remove tag "${tagName}"?`)) {
+                return;
+            }
+
+            try {
+                const authToken = getAuthToken();
+                const headers = {};
+                if (authToken) {
+                    headers['Authorization'] = `Bearer ${authToken}`;
+                }
+
+                const response = await fetch(`/api/v1/images/${imageId}/tags/${encodeURIComponent(tagName)}`, {
+                    method: 'DELETE',
+                    headers: headers
+                });
+
+                if (response.ok || response.status === 204) {
+                    // Reload to show updated tag list
+                    location.reload();
+                } else {
+                    const data = await response.json();
+                    alert(data.detail?.message || 'Failed to remove tag');
+                }
+            } catch (error) {
+                alert('Network error. Please try again.');
+            }
+        }
+
+        // Autocomplete suggestions
+        let autocompleteTimeout = null;
+        async function onTagInput() {
+            const tagInput = document.getElementById('new-tag');
+            const query = tagInput.value.trim();
+
+            // Clear previous timeout
+            if (autocompleteTimeout) {
+                clearTimeout(autocompleteTimeout);
+            }
+
+            // Hide suggestions if query is too short
+            if (query.length < 2) {
+                hideSuggestions();
+                return;
+            }
+
+            // Debounce API call
+            autocompleteTimeout = setTimeout(async () => {
+                try {
+                    const response = await fetch(`/api/v1/tags/search?q=${encodeURIComponent(query)}&limit=10`);
+                    if (response.ok) {
+                        suggestions = await response.json();
+                        showSuggestions(suggestions);
+                    }
+                } catch (error) {
+                    console.error('Autocomplete error:', error);
+                }
+            }, 300); // 300ms debounce
+        }
+
+        // Show autocomplete suggestions
+        function showSuggestions(tags) {
+            const suggestionsDiv = document.getElementById('tag-suggestions');
+
+            if (!tags || tags.length === 0) {
+                hideSuggestions();
+                return;
+            }
+
+            suggestionsDiv.innerHTML = '';
+            tags.forEach((tag, index) => {
+                const item = document.createElement('div');
+                item.className = 'suggestion-item';
+                item.textContent = tag.name;
+                item.dataset.index = index;
+                item.onclick = () => selectSuggestion(tag.name);
+                suggestionsDiv.appendChild(item);
+            });
+
+            suggestionsDiv.classList.remove('hidden');
+            suggestionIndex = -1;
+        }
+
+        // Hide autocomplete suggestions
+        function hideSuggestions() {
+            const suggestionsDiv = document.getElementById('tag-suggestions');
+            suggestionsDiv.classList.add('hidden');
+            suggestionsDiv.innerHTML = '';
+            suggestionIndex = -1;
+        }
+
+        // Select suggestion
+        function selectSuggestion(tagName) {
+            const tagInput = document.getElementById('new-tag');
+            tagInput.value = tagName;
+            hideSuggestions();
+            tagInput.focus();
+        }
+
+        // Handle keyboard navigation in autocomplete
+        function onTagKeydown(event) {
+            const suggestionsDiv = document.getElementById('tag-suggestions');
+            const isHidden = suggestionsDiv.classList.contains('hidden');
+
+            // Enter key
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                if (!isHidden && suggestionIndex >= 0 && suggestionIndex < suggestions.length) {
+                    // Select highlighted suggestion
+                    selectSuggestion(suggestions[suggestionIndex].name);
+                } else {
+                    // Add tag directly
+                    addTag();
+                }
+                return;
+            }
+
+            // Arrow down
+            if (event.key === 'ArrowDown') {
+                event.preventDefault();
+                if (!isHidden && suggestions.length > 0) {
+                    suggestionIndex = Math.min(suggestionIndex + 1, suggestions.length - 1);
+                    highlightSuggestion();
+                }
+                return;
+            }
+
+            // Arrow up
+            if (event.key === 'ArrowUp') {
+                event.preventDefault();
+                if (!isHidden && suggestions.length > 0) {
+                    suggestionIndex = Math.max(suggestionIndex - 1, 0);
+                    highlightSuggestion();
+                }
+                return;
+            }
+
+            // Escape key
+            if (event.key === 'Escape') {
+                hideSuggestions();
+                return;
+            }
+        }
+
+        // Highlight suggestion at current index
+        function highlightSuggestion() {
+            const items = document.querySelectorAll('.suggestion-item');
+            items.forEach((item, index) => {
+                if (index === suggestionIndex) {
+                    item.style.background = 'rgba(196, 149, 106, 0.2)';
+                    item.style.color = '#D4A574';
+                    item.scrollIntoView({ block: 'nearest' });
+                } else {
+                    item.style.background = '';
+                    item.style.color = 'rgba(255, 255, 255, 0.8)';
+                }
+            });
+        }
+
+        // Hide suggestions when clicking outside
+        document.addEventListener('click', (e) => {
+            const tagInput = document.getElementById('new-tag');
+            const suggestionsDiv = document.getElementById('tag-suggestions');
+            if (tagInput && suggestionsDiv && !tagInput.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+                hideSuggestions();
             }
         });
     </script>

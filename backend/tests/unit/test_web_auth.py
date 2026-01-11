@@ -327,6 +327,8 @@ class TestPrivateGallery:
     @pytest.mark.asyncio
     async def test_image_detail_accessible_by_direct_url(self):
         """Image detail should be accessible by anyone with direct URL (unlisted model)."""
+        from unittest.mock import patch
+
         from app.api.web import image_detail
 
         request = MagicMock()
@@ -338,12 +340,26 @@ class TestPrivateGallery:
         image = MagicMock(id="img-123", user_id="owner-456")
         service.get_by_id.return_value = image
 
-        # Anonymous user (user=None) accessing image by direct URL
-        await image_detail(request=request, image_id="img-123", service=service, user=None)
+        # Mock database session for TagService
+        db = AsyncMock()
 
-        # Should be able to view the image
-        service.get_by_id.assert_called_once_with("img-123")
-        call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
-        assert call_kwargs["context"]["image"] == image
-        # is_owner should be falsy for anonymous (None or False)
-        assert not call_kwargs["context"]["is_owner"]
+        # Mock TagService.get_image_tags to return empty list
+        with patch("app.api.web.TagService") as mock_tag_service_class:
+            mock_tag_service_instance = AsyncMock()
+            mock_tag_service_instance.get_image_tags.return_value = []
+            mock_tag_service_class.return_value = mock_tag_service_instance
+
+            # Anonymous user (user=None) accessing image by direct URL
+            await image_detail(
+                request=request, image_id="img-123", service=service, db=db, user=None
+            )
+
+            # Should be able to view the image
+            service.get_by_id.assert_called_once_with("img-123")
+            call_kwargs = request.app.state.templates.TemplateResponse.call_args[1]
+            assert call_kwargs["context"]["image"] == image
+            # is_owner should be falsy for anonymous (None or False)
+            assert not call_kwargs["context"]["is_owner"]
+            # tags should be in context
+            assert "tags" in call_kwargs["context"]
+            assert call_kwargs["context"]["tags"] == []

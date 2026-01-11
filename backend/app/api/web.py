@@ -17,6 +17,7 @@ from app.services.auth import AuthError, create_auth_provider
 from app.services.cache_service import CacheService
 from app.services.image_service import ImageService
 from app.services.storage_service import StorageService
+from app.services.tag_service import TagService
 
 router = APIRouter(tags=["web"])
 
@@ -126,9 +127,10 @@ async def image_detail(
     request: Request,
     image_id: str,
     service: ImageService = Depends(get_image_service),
+    db: AsyncSession = Depends(get_db),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Image detail page - Full image with metadata."""
+    """Image detail page - Full image with metadata and tags."""
     image = await service.get_by_id(image_id)
     templates = get_templates(request)
 
@@ -142,10 +144,14 @@ async def image_detail(
 
     is_owner = user and image.user_id and image.user_id == user.id
 
+    # Fetch tags for this image
+    tag_service = TagService(db=db)
+    tags = await tag_service.get_image_tags(image_id)
+
     return templates.TemplateResponse(
         request=request,
         name="image.html",
-        context={"image": image, "user": user, "is_owner": is_owner},
+        context={"image": image, "user": user, "is_owner": is_owner, "tags": tags},
     )
 
 
