@@ -202,10 +202,13 @@ jobs:
 
       - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
         with:
           host: ${{ secrets.DROPLET_HOST }}
           username: ${{ secrets.DROPLET_USER }}
           key: ${{ secrets.DROPLET_SSH_KEY }}
+          envs: OPENAI_API_KEY
           script: |
             set -e
 
@@ -231,6 +234,18 @@ jobs:
             if [ ! -f "$DEPLOY_DIR/deploy/.env.production" ]; then
               echo "ERROR: .env.production not found. Please create it manually first."
               exit 1
+            fi
+
+            # Inject GitHub Secrets into .env.production
+            echo "Injecting secrets from GitHub..."
+            if [ -n "$OPENAI_API_KEY" ]; then
+              # Remove old OPENAI_API_KEY line if exists
+              sudo sed -i '/^OPENAI_API_KEY=/d' "$DEPLOY_DIR/deploy/.env.production"
+              # Add new OPENAI_API_KEY
+              echo "OPENAI_API_KEY=$OPENAI_API_KEY" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+              echo "✓ OPENAI_API_KEY injected successfully"
+            else
+              echo "⚠️  WARNING: OPENAI_API_KEY not found in GitHub Secrets"
             fi
 
             # Deploy with docker compose
