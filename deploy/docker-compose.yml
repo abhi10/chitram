@@ -212,6 +212,59 @@ services:
     networks:
       - chitram-network
 
+  # ===========================================================================
+  # BACKGROUND JOBS (Celery Worker - Phase 6)
+  # ===========================================================================
+  celery-worker:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      # Database
+      DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://chitram:localdev@postgres:5432/chitram}
+
+      # Storage (MinIO)
+      STORAGE_BACKEND: minio
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-images}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
+
+      # Redis Cache
+      REDIS_HOST: ${REDIS_HOST:-redis}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+
+      # Celery Configuration
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/0
+
+      # AI Tagging (Phase 6)
+      AI_PROVIDER: ${AI_PROVIDER:-mock}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      AI_MAX_TAGS_PER_IMAGE: ${AI_MAX_TAGS_PER_IMAGE:-5}
+      AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-70}
+      OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-4o-mini}
+
+      # Background Task Configuration
+      BACKGROUND_TASK_ENABLED: ${BACKGROUND_TASK_ENABLED:-true}
+      BACKGROUND_TASK_PROVIDER: celery
+
+      # App Settings
+      DEBUG: ${DEBUG:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - chitram-network
+
 # =============================================================================
 # VOLUMES (Persistent Data)
 # =============================================================================

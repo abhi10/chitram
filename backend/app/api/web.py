@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_cache
 from app.api.images import get_storage
+from app.api.tags import get_tag_service
 from app.config import get_settings
 from app.database import get_db
 from app.models.user import User
@@ -127,7 +128,7 @@ async def image_detail(
     request: Request,
     image_id: str,
     service: ImageService = Depends(get_image_service),
-    db: AsyncSession = Depends(get_db),
+    tag_service: TagService = Depends(get_tag_service),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
     """Image detail page - Full image with metadata and tags."""
@@ -145,7 +146,6 @@ async def image_detail(
     is_owner = user and image.user_id and image.user_id == user.id
 
     # Fetch tags for this image
-    tag_service = TagService(db=db)
     tags = await tag_service.get_image_tags(image_id)
 
     return templates.TemplateResponse(

@@ -89,6 +89,16 @@ class Settings(BaseSettings):
     # Google Cloud Vision settings (used when ai_provider = "google")
     google_vision_api_key: str | None = None
 
+    # Celery Configuration (Phase 6)
+    celery_broker_url: str = "redis://localhost:6379/0"  # Redis as message broker
+    celery_result_backend: str = "redis://localhost:6379/0"  # Store task results
+    celery_task_always_eager: bool = False  # Run tasks synchronously in tests
+    celery_task_eager_propagates: bool = True  # Propagate exceptions in eager mode
+
+    # Background Task Configuration (Phase 6)
+    background_task_enabled: bool = True  # Disable in tests for faster execution
+    background_task_provider: str = "celery"  # "celery" or "mock"
+
     @property
     def max_file_size_bytes(self) -> int:
         """Max file size in bytes."""

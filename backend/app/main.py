@@ -124,13 +124,20 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     print(f"✅ Upload concurrency limit: {settings.upload_concurrency_limit}")
 
     # Initialize thumbnail service (Phase 2B)
-    thumbnail_service = ThumbnailService(
-        storage=app.state.storage,
-        session_factory=async_session_maker,
-        cache=cache_service,
-    )
+    thumbnail_service: ThumbnailService | None = None
+    try:
+        thumbnail_service = ThumbnailService(
+            storage=app.state.storage,
+            session_factory=async_session_maker,
+            cache=cache_service,
+        )
+        print("✅ Thumbnail service initialized")
+    except Exception as e:
+        print(f"⚠️ Thumbnail service initialization failed: {e}")
+        print("   App will continue without thumbnail generation")
+        thumbnail_service = None
+
     app.state.thumbnail_service = thumbnail_service
-    print("✅ Thumbnail service initialized")
 
     # Store templates in app.state for web routes (single source of truth)
     app.state.templates = templates
