@@ -259,7 +259,9 @@ jobs:
             fi
 
             # Inject AI_PROVIDER (defaults to 'mock' if not set)
+            echo "DEBUG: Raw AI_PROVIDER env var: [$AI_PROVIDER]"
             AI_PROVIDER_VALUE="${AI_PROVIDER:-mock}"
+            echo "DEBUG: After default substitution: [$AI_PROVIDER_VALUE]"
             echo "AI_PROVIDER=$AI_PROVIDER_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
             echo "✓ AI_PROVIDER=$AI_PROVIDER_VALUE"
 
