@@ -278,7 +278,29 @@ jobs:
             echo "OPENAI_VISION_MODEL=$OPENAI_MODEL_VALUE" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
             echo "✓ OPENAI_VISION_MODEL=$OPENAI_MODEL_VALUE"
 
-            echo "✓ All AI configuration injected successfully"
+            # Inject Celery broker URLs with Redis password
+            echo "Configuring Celery broker URLs..."
+
+            # Extract REDIS_PASSWORD from .env.production
+            REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' "$DEPLOY_DIR/deploy/.env.production" | cut -d'=' -f2- | tr -d '\n\r')
+
+            # Remove old Celery configuration if exists
+            sudo sed -i '/^CELERY_BROKER_URL=/d' "$DEPLOY_DIR/deploy/.env.production"
+            sudo sed -i '/^CELERY_RESULT_BACKEND=/d' "$DEPLOY_DIR/deploy/.env.production"
+
+            # Construct Celery URLs with password
+            if [ -n "$REDIS_PASSWORD" ]; then
+              CELERY_URL="redis://:${REDIS_PASSWORD}@redis:6379/0"
+              echo "CELERY_BROKER_URL=$CELERY_URL" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+              echo "CELERY_RESULT_BACKEND=$CELERY_URL" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+              echo "✓ Celery URLs configured with Redis authentication"
+            else
+              echo "⚠️  WARNING: REDIS_PASSWORD not set, Celery will use no authentication"
+              echo "CELERY_BROKER_URL=redis://redis:6379/0" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+              echo "CELERY_RESULT_BACKEND=redis://redis:6379/0" | sudo tee -a "$DEPLOY_DIR/deploy/.env.production" > /dev/null
+            fi
+
+            echo "✓ All configuration injected successfully"
 
             # Deploy with docker compose
             echo "Starting services..."

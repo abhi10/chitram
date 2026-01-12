@@ -238,8 +238,9 @@ services:
       REDIS_PASSWORD: ${REDIS_PASSWORD:-}
 
       # Celery Configuration
-      CELERY_BROKER_URL: redis://redis:6379/0
-      CELERY_RESULT_BACKEND: redis://redis:6379/0
+      # Allow override via env for production with password
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
 
       # AI Tagging (Phase 6)
       AI_PROVIDER: ${AI_PROVIDER:-mock}
