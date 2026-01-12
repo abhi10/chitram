@@ -1,8 +1,8 @@
 # Chitram - TODO List & Progress Tracker
 
 **Repository:** https://github.com/abhi10/chitram
-**Current Phase:** Phase 5 Complete - AI Vision Provider + Production Deployed
-**Last Updated:** 2026-01-11
+**Current Phase:** Phase 6 Complete - Automatic AI Tagging with Background Jobs
+**Last Updated:** 2026-01-12
 
 ---
 
@@ -17,8 +17,8 @@
 | **Phase 3** | ✅ Complete | `main` | Web UI (HTMX + Jinja2), deployed 2026-01-04 |
 | **Phase 3.5** | ✅ Complete | `main` | Supabase Auth Integration, 255 tests |
 | **Phase 5** | ✅ Complete | `main` | AI Vision Provider (OpenAI gpt-4o-mini), 323 tests |
-| **Phase 6** | ⏸️ Next | - | Automatic AI Tagging on Upload (Celery) |
-| **Phase 7** | ⏸️ Future | - | Distributed Cache (Consistent Hashing) |
+| **Phase 6** | ✅ Complete | `main` | Automatic AI Tagging (Celery + Storage Factory), 355 tests |
+| **Phase 7** | ⏸️ Next | - | Distributed Cache (Consistent Hashing) |
 | **Phase 8** | ⏸️ Future | - | Basic Observability (Prometheus)
 
 ---
@@ -1047,34 +1047,42 @@ git push origin --delete feature/phase-X.X
 **Current State:** Phase 5 Complete - AI Vision Provider deployed at https://chitram.io
 
 **Recently Completed:**
+- ✅ **Phase 6: Automatic AI Tagging with Background Jobs (2026-01-12)**
+  - Celery + Redis background job queue
+  - Automatic AI tagging on image upload (no manual endpoint)
+  - 355 tests passing (26 new tests for tasks/background services)
+  - Storage factory pattern (DRY principle - eliminated code duplication)
+  - Deployment debugging: 5 PRs (#61-65) to fix infrastructure issues
+  - Production verified: 5 AI tags per image in ~10 seconds
+  - Cost: $0.0001658 per image (OpenAI gpt-4o-mini)
+  - Retrospective documented: Infrastructure integration lessons
 - ✅ **Phase 5: AI Vision Provider (2026-01-11)**
   - OpenAI Vision API integration (gpt-4o-mini)
   - 323 tests passing (21 AI unit tests, 5 integration tests)
   - GitHub Secrets automation for AI configuration
-  - Manual testing endpoint: `POST /api/v1/images/{id}/ai-tag`
+  - Manual testing endpoint: `POST /api/v1/images/{id}/ai-tag` (removed in Phase 6)
   - 3 production tests: 100% success rate, 90% confidence tags
-  - Cost: ~$0.004 per image
 - ✅ Supabase Auth Integration (Phase 3.5)
 - ✅ FR-4.1 Security Fix - Private galleries
 - ✅ Web UI with HTMX (Phase 3)
 - ✅ CD Pipeline with GitHub Actions
 - ✅ Production deployment on DigitalOcean
 
-**Up Next (Phase 6 - Automatic AI Tagging):**
-- [ ] Background job queue with Celery + Redis
-- [ ] Automatic AI tagging on image upload
-- [ ] Retry logic for failed API calls (3 attempts, exponential backoff)
-- [ ] Remove temporary manual testing endpoint
-- [ ] Automatic provider fallback (OpenAI → Google → Mock)
+**Up Next (Phase 7 - Improvements):**
+- [ ] Add E2E integration test for Celery AI tagging flow
+- [ ] Create staging environment (mimics production)
+- [ ] Add deployment verification checklist
+- [ ] Distributed Cache with Consistent Hashing (optional)
 
 > **Note:** Phase 4 (Advanced Features - Checksum, Deduplication) is optional and can be skipped.
 
 **Production Status:**
 - 🌐 Live at: https://chitram.io
 - 🔒 Auth: Supabase (production) / Local JWT (tests)
-- 🤖 AI Tagging: OpenAI Vision API (gpt-4o-mini)
-- 📊 Tests: 323 passing
+- 🤖 AI Tagging: Automatic on upload (Celery + OpenAI gpt-4o-mini)
+- 📊 Tests: 355 passing
 - 🚀 CD: Auto-deploy on merge to main
+- ⚡ Background Jobs: Celery worker with Redis broker
 
 ---
 
@@ -1090,16 +1098,17 @@ Phase 2B        ✅ Complete (188 tests, 2026-01-03)
 Phase 3         ✅ Complete (Web UI deployed 2026-01-04)
 Phase 3.5       ✅ Complete (Supabase Auth, 255 tests, 2026-01-08)
 Phase 5         ✅ Complete (AI Vision Provider, 323 tests, 2026-01-11)
-Phase 6         ⏸️ Next - Automatic AI Tagging (Celery background jobs)
+Phase 6         ✅ Complete (Automatic AI Tagging, 355 tests, 2026-01-12)
+Phase 7         ⏸️ Next - Testing & Infrastructure Improvements
 Phase 4         ⏸️ Future - Advanced Features (Checksum, Dedup) [Optional]
-Phase 7         ⏸️ Future - Distributed Cache (Consistent Hashing)
-Phase 8         ⏸️ Future - Basic Observability (Prometheus)
+Phase 8         ⏸️ Future - Distributed Cache (Consistent Hashing)
+Phase 9         ⏸️ Future - Basic Observability (Prometheus)
 ```
 
-**Current Status:** 🟢 Production deployed
+**Current Status:** 🟢 Production deployed with automatic AI tagging
 **Production URL:** https://chitram.io
 **Blockers:** None
-**Last Updated:** 2026-01-08
+**Last Updated:** 2026-01-12
 
 ---
 
@@ -1130,9 +1139,14 @@ Phase 8         ⏸️ Future - Basic Observability (Prometheus)
 - [x] **2026-01-08:** FR-4.1 security fix - Private galleries (PR #38)
 - [x] **2026-01-08:** Post-deploy checklist and auth retro action items (PR #39)
 - [x] **2026-01-08:** Descoped Phase 5/6 for MVP focus (removed over-engineering)
-- [ ] **Future:** Phase 5 Distributed Cache (Consistent Hashing) ← Learning focus
-- [ ] **Future:** Phase 6 Basic Observability (Prometheus)
-- [ ] **Optional:** Phase 4 Advanced Features (Celery, Dedup)
+- [x] **2026-01-11:** Phase 5 AI Vision Provider complete (PR #60)
+- [x] **2026-01-12:** Phase 6 Automatic AI Tagging complete (PRs #60-65)
+- [x] **2026-01-12:** Storage factory pattern refactor (DRY principle, PR #65)
+- [x] **2026-01-12:** Phase 6 deployment debugging retrospective created
+- [ ] **Future:** Phase 7 Testing & Infrastructure Improvements
+- [ ] **Future:** Phase 8 Distributed Cache (Consistent Hashing) ← Learning focus
+- [ ] **Future:** Phase 9 Basic Observability (Prometheus)
+- [ ] **Optional:** Phase 4 Advanced Features (Checksum, Dedup)
 - [ ] **Target:** v1.0.0 production-ready system
 
 ---
