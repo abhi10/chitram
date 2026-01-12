@@ -233,8 +233,9 @@ Environment variables (see `.env.example`):
 
 Share technical learnings and debugging stories:
 
-- [Debugging 5 Cascading Infrastructure Failures](blog/2026/01-phase6-deployment-debugging.md) - Celery deployment debugging journey
-- [The Storage Factory Pattern](blog/2026/02-storage-factory-pattern.md) - How code duplication caused a production bug
+- [Adding AI Vision to an Image Host: From Manual Tags to OpenAI](blog/2026/01-adding-ai-vision-openai-integration.md) - OpenAI Vision API integration with Strategy pattern
+- [Debugging 5 Cascading Infrastructure Failures](blog/2026/02-phase6-deployment-debugging.md) - Celery deployment debugging journey
+- [The Storage Factory Pattern](blog/2026/03-storage-factory-pattern.md) - How code duplication caused a production bug
 
 See [blog/README.md](blog/README.md) for writing guidelines and publishing process.
 
