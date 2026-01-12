@@ -107,8 +107,21 @@ async def _tag_image_async(image_id: str) -> dict:
 
     # Create services
     async with async_session_maker() as db:
-        # Initialize storage (same as main.py)
-        storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
+        # Initialize storage backend (same logic as main.py)
+        if settings.storage_backend == "minio":
+            from app.services.storage_service import MinioStorageBackend
+
+            storage_backend = await MinioStorageBackend.create(
+                endpoint=settings.minio_endpoint,
+                access_key=settings.minio_access_key,
+                secret_key=settings.minio_secret_key,
+                bucket=settings.minio_bucket,
+                secure=settings.minio_secure,
+                startup_timeout=settings.minio_startup_timeout,
+            )
+        else:
+            storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
+
         storage = StorageService(backend=storage_backend)
 
         # Initialize services
