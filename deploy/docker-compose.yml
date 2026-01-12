@@ -219,7 +219,7 @@ services:
     build:
       context: ../backend
       dockerfile: Dockerfile
-    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    command: uv run celery -A app.celery_app worker --loglevel=info --concurrency=2
     environment:
       # Database
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://chitram:localdev@postgres:5432/chitram}
