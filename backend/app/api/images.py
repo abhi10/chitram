@@ -24,14 +24,12 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
-from app.services.ai import AIProviderError, create_ai_provider
 from app.services.background import BackgroundTaskService
 from app.services.cache_service import CacheService
 from app.services.concurrency import UploadSemaphore
 from app.services.image_service import ImageService
 from app.services.rate_limiter import RateLimiter
 from app.services.storage_service import StorageService
-from app.services.tag_service import TagService
 from app.services.thumbnail_service import ThumbnailService
 from app.utils.validation import validate_image_file
 
@@ -436,126 +434,3 @@ async def delete_image(
                 message="Not authorized to delete this image",
             ).model_dump(),
         )
-
-
-@router.post(
-    "/{image_id}/ai-tag",
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "AI tags generated successfully"},
-        404: {"model": ErrorResponse, "description": "Image not found"},
-        403: {"model": ErrorResponse, "description": "Not authorized"},
-        500: {"model": ErrorResponse, "description": "AI provider error"},
-    },
-)
-async def generate_ai_tags(
-    image_id: str,
-    service: ImageService = Depends(get_image_service),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_current_user),
-) -> dict:
-    """
-    TEMPORARY ENDPOINT (Phase 5): Manually trigger AI tagging for an image.
-
-    This endpoint will be removed in Phase 6 when auto-tagging is integrated
-    into the upload flow as a background task.
-
-    Usage:
-    1. Upload an image via web UI
-    2. Call POST /api/v1/images/{id}/ai-tag
-    3. Refresh page to see AI tags
-
-    Requires:
-    - Authentication (user must be logged in)
-    - User must own the image
-    - OPENAI_API_KEY configured in environment
-
-    Returns:
-    - List of AI-generated tags with confidence scores
-    - Tags are automatically saved to database (source='ai')
-    """
-    # 1. Get image metadata and verify ownership
-    image = await service.get_by_id(image_id)
-
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message=f"Image with ID '{image_id}' not found",
-            ).model_dump(),
-        )
-
-    # 2. Verify user owns this image
-    if image.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ErrorDetail(
-                code="FORBIDDEN",
-                message="You do not own this image",
-            ).model_dump(),
-        )
-
-    # 3. Fetch image bytes from storage
-    result = await service.get_file(image_id)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message="Image file not found in storage",
-            ).model_dump(),
-        )
-
-    image_bytes, _, _ = result
-
-    # 4. Call AI provider (with graceful degradation)
-    try:
-        ai_provider = create_ai_provider(settings)
-        tags = await ai_provider.analyze_image(image_bytes)
-    except AIProviderError as e:
-        # Graceful degradation: Don't break UX when AI fails
-        # This is especially important for quota errors, API downtime, etc.
-        print(f"AI provider failed for image {image_id}: {e}")
-        return {
-            "message": "Image is ready, but AI tagging is temporarily unavailable",
-            "image_id": image_id,
-            "tags": [],
-            "provider": settings.ai_provider,
-            "model": settings.openai_vision_model if settings.ai_provider == "openai" else None,
-            "error": str(e),
-            "suggestion": "Try again later or switch to mock provider (AI_PROVIDER=mock)",
-        }
-
-    # 5. Save tags to database
-    tag_service = TagService(db=db)
-    saved_tags = []
-
-    for tag in tags:
-        try:
-            await tag_service.add_tag_to_image(
-                image_id=image_id,
-                tag_name=tag.name,
-                source="ai",
-                confidence=tag.confidence,
-                category=tag.category,
-            )
-            saved_tags.append(
-                {
-                    "name": tag.name,
-                    "confidence": tag.confidence,
-                    "category": tag.category,
-                }
-            )
-        except Exception as e:
-            # Log error but continue with other tags
-            print(f"Failed to save tag {tag.name}: {e}")
-
-    # 6. Return results
-    return {
-        "message": f"Added {len(saved_tags)} AI tags to image",
-        "image_id": image_id,
-        "tags": saved_tags,
-        "provider": settings.ai_provider,
-        "model": settings.openai_vision_model if settings.ai_provider == "openai" else None,
-    }
