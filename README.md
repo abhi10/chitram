@@ -4,6 +4,8 @@ A production-ready image hosting application built with FastAPI, featuring a web
 
 **Live Demo:** https://chitram.io
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/abhi10/chitram)
+
 ## Features
 
 - **Web UI** - Upload, view, and manage images with a responsive gallery
