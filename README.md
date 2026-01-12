@@ -227,18 +227,30 @@ Environment variables (see `.env.example`):
 - [Requirements](docs/requirements/) - Phase requirements
 - [ADRs](docs/adr/) - Architecture decision records
 - [Deployment](docs/deployment/) - Deployment guides
+- [Blog](blog/) - Technical blog posts and learnings
+
+## Blog Posts
+
+Share technical learnings and debugging stories:
+
+- [Debugging 5 Cascading Infrastructure Failures](blog/2026/01-phase6-deployment-debugging.md) - Celery deployment debugging journey
+- [The Storage Factory Pattern](blog/2026/02-storage-factory-pattern.md) - How code duplication caused a production bug
+
+See [blog/README.md](blog/README.md) for writing guidelines and publishing process.
 
 ## Project Status
 
-- **Phase 3.5 Complete** - Supabase Auth + Production Deployed
-- **255 tests passing**
+- **Phase 6 Complete** - Automatic AI Tagging with Background Jobs
+- **355 tests passing**
 - **Live at:** https://chitram.io
 
 See [TODO.md](TODO.md) for detailed progress.
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
+
+Blog posts are licensed under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
 
 ---
 
