@@ -76,6 +76,13 @@ services:
       AI_CONFIDENCE_THRESHOLD: ${AI_CONFIDENCE_THRESHOLD:-70}
       OPENAI_VISION_MODEL: ${OPENAI_VISION_MODEL:-gpt-4o-mini}
 
+      # Celery Configuration (Phase 6)
+      # App needs these to enqueue background tasks
+      CELERY_BROKER_URL: ${CELERY_BROKER_URL:-redis://redis:6379/0}
+      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND:-redis://redis:6379/0}
+      BACKGROUND_TASK_ENABLED: ${BACKGROUND_TASK_ENABLED:-true}
+      BACKGROUND_TASK_PROVIDER: celery
+
       # App Settings
       DEBUG: ${DEBUG:-false}
     depends_on:
