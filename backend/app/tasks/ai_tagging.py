@@ -7,7 +7,8 @@ from app.config import get_settings
 from app.database import async_session_maker
 from app.services.ai import AIProviderError, create_ai_provider
 from app.services.image_service import ImageService
-from app.services.storage_service import LocalStorageBackend, StorageService
+from app.services.storage_factory import create_storage_backend
+from app.services.storage_service import StorageService
 from app.services.tag_service import TagService
 
 logger = logging.getLogger(__name__)
@@ -107,21 +108,8 @@ async def _tag_image_async(image_id: str) -> dict:
 
     # Create services
     async with async_session_maker() as db:
-        # Initialize storage backend (same logic as main.py)
-        if settings.storage_backend == "minio":
-            from app.services.storage_service import MinioStorageBackend
-
-            storage_backend = await MinioStorageBackend.create(
-                endpoint=settings.minio_endpoint,
-                access_key=settings.minio_access_key,
-                secret_key=settings.minio_secret_key,
-                bucket=settings.minio_bucket,
-                secure=settings.minio_secure,
-                startup_timeout=settings.minio_startup_timeout,
-            )
-        else:
-            storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
-
+        # Initialize storage using shared factory (DRY principle)
+        storage_backend = await create_storage_backend(settings)
         storage = StorageService(backend=storage_backend)
 
         # Initialize services

@@ -25,11 +25,8 @@ from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.services.cache_service import CacheService, set_cache
 from app.services.concurrency import UploadSemaphore, set_upload_semaphore
 from app.services.rate_limiter import RateLimiter, set_rate_limiter
-from app.services.storage_service import (
-    LocalStorageBackend,
-    MinioStorageBackend,
-    StorageService,
-)
+from app.services.storage_factory import create_storage_backend
+from app.services.storage_service import StorageService
 from app.services.thumbnail_service import ThumbnailService
 
 settings = get_settings()
@@ -49,23 +46,11 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     await init_db()
     print("✅ Database initialized")
 
-    # Initialize storage backend based on configuration
-    if settings.storage_backend == "minio":
-        storage_backend = await MinioStorageBackend.create(
-            endpoint=settings.minio_endpoint,
-            access_key=settings.minio_access_key,
-            secret_key=settings.minio_secret_key,
-            bucket=settings.minio_bucket,
-            secure=settings.minio_secure,
-            startup_timeout=settings.minio_startup_timeout,
-        )
-        print("✅ Storage initialized (MinIO)")
-    else:
-        storage_backend = LocalStorageBackend(base_path=settings.local_storage_path)
-        print("✅ Storage initialized (local filesystem)")
-
-    # Store storage service in app state
+    # Initialize storage using shared factory (DRY principle)
+    storage_backend = await create_storage_backend(settings)
     app.state.storage = StorageService(backend=storage_backend)
+    backend_name = "MinIO" if settings.storage_backend == "minio" else "local filesystem"
+    print(f"✅ Storage initialized ({backend_name})")
 
     # Initialize Redis cache (Phase 2)
     cache_service: CacheService | None = None
