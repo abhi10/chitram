@@ -1,5 +1,6 @@
 """Image API endpoints."""
 
+import logging
 from typing import Annotated
 
 from fastapi import (
@@ -24,6 +25,7 @@ from app.models.user import User
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
 from app.services.ai import AIProviderError, create_ai_provider
+from app.services.background import BackgroundTaskService
 from app.services.cache_service import CacheService
 from app.services.concurrency import UploadSemaphore
 from app.services.image_service import ImageService
@@ -35,6 +37,7 @@ from app.utils.validation import validate_image_file
 
 router = APIRouter(prefix="/images", tags=["images"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def get_storage(request: Request) -> StorageService:
@@ -45,6 +48,11 @@ def get_storage(request: Request) -> StorageService:
 def get_thumbnail_service(request: Request) -> ThumbnailService | None:
     """Dependency to get thumbnail service from app state."""
     return getattr(request.app.state, "thumbnail_service", None)
+
+
+def get_task_service(request: Request) -> BackgroundTaskService:
+    """Dependency to get background task service from app state."""
+    return request.app.state.task_service
 
 
 def get_image_service(
@@ -112,6 +120,7 @@ async def upload_image(
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
     thumbnail_service: ThumbnailService | None = Depends(get_thumbnail_service),
+    task_service: BackgroundTaskService = Depends(get_task_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
     current_user: User = Depends(require_current_user),
 ) -> ImageUploadResponse:
@@ -124,6 +133,7 @@ async def upload_image(
 
     - All uploads are linked to the authenticated user.
     - Thumbnail generation is queued as a background task (Phase 2B).
+    - AI tagging is queued as a background task (Phase 6).
     """
     # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
     if semaphore:
@@ -176,6 +186,15 @@ async def upload_image(
                 thumbnail_service.generate_and_store_thumbnail,
                 image.id,
             )
+
+        # Queue AI tagging as background task (Phase 6)
+        # Graceful degradation: Upload succeeds even if tagging fails
+        try:
+            task_id = await task_service.enqueue_ai_tagging(image.id)
+            logger.info(f"AI tagging task enqueued: {task_id} for image {image.id}")
+        except Exception as e:
+            # Log error but don't fail upload (graceful degradation)
+            logger.error(f"Failed to enqueue AI tagging for image {image.id}: {e}")
 
         # Build response (delete_token only for anonymous uploads)
         # thumbnail_ready=False since background task hasn't run yet
