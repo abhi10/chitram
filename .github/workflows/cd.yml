@@ -281,8 +281,8 @@ jobs:
             # Inject Celery broker URLs with Redis password
             echo "Configuring Celery broker URLs..."
 
-            # Extract REDIS_PASSWORD from .env.production
-            REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' "$DEPLOY_DIR/deploy/.env.production" | cut -d'=' -f2- | tr -d '\n\r')
+            # Extract REDIS_PASSWORD from .env.production (strip quotes and whitespace)
+            REDIS_PASSWORD=$(grep '^REDIS_PASSWORD=' "$DEPLOY_DIR/deploy/.env.production" | cut -d'=' -f2- | tr -d '\n\r"')
 
             # Remove old Celery configuration if exists
             sudo sed -i '/^CELERY_BROKER_URL=/d' "$DEPLOY_DIR/deploy/.env.production"
