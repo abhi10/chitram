@@ -8,11 +8,11 @@
 - pytest for testing
 
 ## Current Status
-- **Current Phase:** Phase 5 deployed to production (https://chitram.io)
-- **Tests:** 323 passing (21 AI provider unit tests, 5 integration tests)
-- **Production:** DigitalOcean droplet with Docker Compose, Caddy, PostgreSQL, MinIO, Redis
+- **Current Phase:** Phase 6 deployed to production (https://chitram.io)
+- **Tests:** 355 passing (26 new tests for background jobs)
+- **Production:** DigitalOcean droplet with Docker Compose, Caddy, PostgreSQL, MinIO, Redis, Celery
 - **Auth:** Supabase authentication with pluggable provider pattern
-- **AI Tagging:** OpenAI Vision API (gpt-4o-mini) for image auto-tagging
+- **AI Tagging:** Automatic on upload (Celery + OpenAI gpt-4o-mini, ~10 second latency)
 
 ## Key Decisions
 - Using GitHub Codespaces for development (ADR-0007)
@@ -239,7 +239,38 @@ async def client(test_deps: TestDependencies):
 
 **Pattern:** Production uses `app.state` as container, tests use `TestDependencies`. Both explicit and mirrored.
 
-### 7. Pluggable Auth Provider Pattern (services/auth/)
+### 7. Storage Factory Pattern (services/storage_factory.py) - Phase 6
+
+**CRITICAL:** Always use `create_storage_backend()` for storage initialization, never duplicate if/else logic.
+
+**Problem Solved:** Phase 6 deployment revealed duplicated storage initialization code between `main.py` and `ai_tagging.py` caused production bug where app used MinIO but Celery worker used local filesystem → FileNotFoundError.
+
+**Solution:**
+```python
+# app/services/storage_factory.py
+async def create_storage_backend(settings: Settings) -> StorageBackend:
+    """Single source of truth for storage initialization."""
+    if settings.storage_backend == "minio":
+        return await MinioStorageBackend.create(...)
+    elif settings.storage_backend == "local":
+        return LocalStorageBackend(base_path=settings.local_storage_path)
+    else:
+        return LocalStorageBackend(base_path=settings.local_storage_path)
+
+# Used by both main.py and ai_tagging.py
+storage_backend = await create_storage_backend(settings)
+storage = StorageService(backend=storage_backend)
+```
+
+**Why:**
+- DRY: Storage logic in ONE place (eliminated 17 lines of duplicate code)
+- Consistency: App and worker guaranteed to use same backend
+- Extensibility: Easy to add S3, GCS, Azure Blob
+- Prevents bugs: No more environment-specific code duplication
+
+**Related:** See [Phase 6 Retrospective](docs/retrospectives/2026-01-12-phase6-deployment-debugging.md) for full incident analysis.
+
+### 8. Pluggable Auth Provider Pattern (services/auth/)
 
 **CRITICAL:** Always use `create_auth_provider()` for token verification, never `AuthService` directly.
 
