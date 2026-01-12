@@ -52,7 +52,8 @@ class TestOpenAIVisionIntegration:
             ai_max_tags_per_image=5,
         )
 
-        provider = create_ai_provider(settings)
+        # Use strict mode to get actual OpenAI provider, not fallback
+        provider = create_ai_provider(settings, use_fallback=False)
         tags = await provider.analyze_image(sample_jpeg_bytes)
 
         # Assertions
@@ -79,7 +80,8 @@ class TestOpenAIVisionIntegration:
             openai_api_key="sk-invalid-key-12345",
         )
 
-        provider = create_ai_provider(settings)
+        # Use strict mode to get actual OpenAI provider, not fallback
+        provider = create_ai_provider(settings, use_fallback=False)
 
         with pytest.raises(AIProviderError) as exc_info:
             await provider.analyze_image(sample_jpeg_bytes)
@@ -122,7 +124,8 @@ class TestOpenAIVisionIntegration:
             pytest.skip("OPENAI_API_KEY not set")
 
         settings = Settings(ai_provider="openai", openai_api_key=api_key)
-        provider = create_ai_provider(settings)
+        # Use strict mode to get actual OpenAI provider, not fallback
+        provider = create_ai_provider(settings, use_fallback=False)
 
         # Empty bytes should raise an error
         with pytest.raises(AIProviderError):
@@ -145,7 +148,8 @@ class TestOpenAIVisionIntegration:
             openai_vision_model="gpt-4o-mini",
         )
 
-        provider = create_ai_provider(settings)
+        # Use strict mode to get actual OpenAI provider, not fallback
+        provider = create_ai_provider(settings, use_fallback=False)
         assert provider.model == "gpt-4o-mini"
 
         tags = await provider.analyze_image(sample_jpeg_bytes)

@@ -139,6 +139,13 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
     app.state.thumbnail_service = thumbnail_service
 
+    # Initialize background task service (Phase 6)
+    from app.services.background import create_task_service
+
+    task_service = create_task_service(settings)
+    app.state.task_service = task_service
+    print("✅ Background task service initialized")
+
     # Store templates in app.state for web routes (single source of truth)
     app.state.templates = templates
 

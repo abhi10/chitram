@@ -131,39 +131,39 @@ class TestAIProviderFactory:
         assert isinstance(provider, AITaggingProvider)
 
     def test_raises_for_unknown_provider(self):
-        """Factory raises ValueError for unknown provider type."""
+        """Factory raises ValueError for unknown provider type (strict mode)."""
         settings = Settings(ai_provider="unknown-provider")
 
         with pytest.raises(ValueError) as exc_info:
-            create_ai_provider(settings)
+            create_ai_provider(settings, use_fallback=False)
 
         assert "Unknown AI provider" in str(exc_info.value)
         assert "unknown-provider" in str(exc_info.value)
 
     def test_raises_for_missing_openai_key(self):
-        """Factory raises AIProviderError if OpenAI key not configured."""
+        """Factory raises AIProviderError if OpenAI key not configured (strict mode)."""
         settings = Settings(ai_provider="openai", openai_api_key=None)
 
         with pytest.raises(AIProviderError) as exc_info:
-            create_ai_provider(settings)
+            create_ai_provider(settings, use_fallback=False)
 
         assert "OpenAI API key" in str(exc_info.value)
 
     def test_raises_for_empty_openai_key(self):
-        """Factory raises AIProviderError if OpenAI key is empty string."""
+        """Factory raises AIProviderError if OpenAI key is empty string (strict mode)."""
         settings = Settings(ai_provider="openai", openai_api_key="")
 
         with pytest.raises(AIProviderError) as exc_info:
-            create_ai_provider(settings)
+            create_ai_provider(settings, use_fallback=False)
 
         assert "OpenAI API key" in str(exc_info.value)
 
     def test_raises_for_missing_google_key(self):
-        """Factory raises AIProviderError if Google Vision key not configured."""
+        """Factory raises AIProviderError if Google Vision key not configured (strict mode)."""
         settings = Settings(ai_provider="google", google_vision_api_key=None)
 
         with pytest.raises(AIProviderError) as exc_info:
-            create_ai_provider(settings)
+            create_ai_provider(settings, use_fallback=False)
 
         assert "Google Vision API key" in str(exc_info.value)
 

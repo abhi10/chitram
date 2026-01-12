@@ -28,6 +28,7 @@ from app.database import Base, get_db
 from app.main import app
 from app.models.user import User
 from app.services.auth_service import AuthService
+from app.services.background import BackgroundTaskService, MockTaskService
 from app.services.cache_service import CacheService, set_cache
 from app.services.concurrency import UploadSemaphore, set_upload_semaphore
 from app.services.rate_limiter import RateLimiter, set_rate_limiter
@@ -55,6 +56,7 @@ class TestDependencies:
     session: AsyncSession
     storage: StorageService
     thumbnail_service: ThumbnailService
+    task_service: BackgroundTaskService
     cache: CacheService | None = None
     rate_limiter: RateLimiter | None = None
     upload_semaphore: UploadSemaphore | None = None
@@ -155,6 +157,9 @@ async def test_deps(test_storage: StorageService) -> AsyncGenerator[TestDependen
         session_factory=session_maker,
     )
 
+    # Initialize background task service (MockTaskService for tests)
+    task_service = MockTaskService()
+
     # Build the container with all dependencies
     deps = TestDependencies(
         engine=engine,
@@ -162,6 +167,7 @@ async def test_deps(test_storage: StorageService) -> AsyncGenerator[TestDependen
         session=session,
         storage=test_storage,
         thumbnail_service=thumbnail_service,
+        task_service=task_service,
         cache=None,  # Disabled for most tests
         rate_limiter=None,  # Disabled for most tests
         upload_semaphore=None,  # Disabled for most tests
@@ -216,6 +222,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     # Wire up app.state from our container (mirrors main.py lifespan)
     app.state.storage = test_deps.storage
     app.state.thumbnail_service = test_deps.thumbnail_service
+    app.state.task_service = test_deps.task_service
     app.state.cache = test_deps.cache
     app.state.rate_limiter = test_deps.rate_limiter
     app.state.upload_semaphore = test_deps.upload_semaphore
@@ -234,6 +241,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     app.dependency_overrides.clear()
     app.state.storage = None
     app.state.thumbnail_service = None
+    app.state.task_service = None
     app.state.cache = None
     app.state.rate_limiter = None
     app.state.upload_semaphore = None

@@ -1,5 +1,6 @@
 """Image API endpoints."""
 
+import logging
 from typing import Annotated
 
 from fastapi import (
@@ -23,18 +24,18 @@ from app.database import get_db
 from app.models.user import User
 from app.schemas.error import ErrorCodes, ErrorDetail, ErrorResponse
 from app.schemas.image import ImageMetadata, ImageUploadResponse
-from app.services.ai import AIProviderError, create_ai_provider
+from app.services.background import BackgroundTaskService
 from app.services.cache_service import CacheService
 from app.services.concurrency import UploadSemaphore
 from app.services.image_service import ImageService
 from app.services.rate_limiter import RateLimiter
 from app.services.storage_service import StorageService
-from app.services.tag_service import TagService
 from app.services.thumbnail_service import ThumbnailService
 from app.utils.validation import validate_image_file
 
 router = APIRouter(prefix="/images", tags=["images"])
 settings = get_settings()
+logger = logging.getLogger(__name__)
 
 
 def get_storage(request: Request) -> StorageService:
@@ -45,6 +46,11 @@ def get_storage(request: Request) -> StorageService:
 def get_thumbnail_service(request: Request) -> ThumbnailService | None:
     """Dependency to get thumbnail service from app state."""
     return getattr(request.app.state, "thumbnail_service", None)
+
+
+def get_task_service(request: Request) -> BackgroundTaskService:
+    """Dependency to get background task service from app state."""
+    return request.app.state.task_service
 
 
 def get_image_service(
@@ -112,6 +118,7 @@ async def upload_image(
     file: Annotated[UploadFile, File(description="Image file to upload")],
     service: ImageService = Depends(get_image_service),
     thumbnail_service: ThumbnailService | None = Depends(get_thumbnail_service),
+    task_service: BackgroundTaskService = Depends(get_task_service),
     semaphore: UploadSemaphore | None = Depends(get_upload_semaphore),
     current_user: User = Depends(require_current_user),
 ) -> ImageUploadResponse:
@@ -124,6 +131,7 @@ async def upload_image(
 
     - All uploads are linked to the authenticated user.
     - Thumbnail generation is queued as a background task (Phase 2B).
+    - AI tagging is queued as a background task (Phase 6).
     """
     # Acquire semaphore BEFORE reading file (memory optimization per ADR-0010)
     if semaphore:
@@ -176,6 +184,15 @@ async def upload_image(
                 thumbnail_service.generate_and_store_thumbnail,
                 image.id,
             )
+
+        # Queue AI tagging as background task (Phase 6)
+        # Graceful degradation: Upload succeeds even if tagging fails
+        try:
+            task_id = await task_service.enqueue_ai_tagging(image.id)
+            logger.info(f"AI tagging task enqueued: {task_id} for image {image.id}")
+        except Exception as e:
+            # Log error but don't fail upload (graceful degradation)
+            logger.error(f"Failed to enqueue AI tagging for image {image.id}: {e}")
 
         # Build response (delete_token only for anonymous uploads)
         # thumbnail_ready=False since background task hasn't run yet
@@ -417,126 +434,3 @@ async def delete_image(
                 message="Not authorized to delete this image",
             ).model_dump(),
         )
-
-
-@router.post(
-    "/{image_id}/ai-tag",
-    status_code=status.HTTP_200_OK,
-    responses={
-        200: {"description": "AI tags generated successfully"},
-        404: {"model": ErrorResponse, "description": "Image not found"},
-        403: {"model": ErrorResponse, "description": "Not authorized"},
-        500: {"model": ErrorResponse, "description": "AI provider error"},
-    },
-)
-async def generate_ai_tags(
-    image_id: str,
-    service: ImageService = Depends(get_image_service),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(require_current_user),
-) -> dict:
-    """
-    TEMPORARY ENDPOINT (Phase 5): Manually trigger AI tagging for an image.
-
-    This endpoint will be removed in Phase 6 when auto-tagging is integrated
-    into the upload flow as a background task.
-
-    Usage:
-    1. Upload an image via web UI
-    2. Call POST /api/v1/images/{id}/ai-tag
-    3. Refresh page to see AI tags
-
-    Requires:
-    - Authentication (user must be logged in)
-    - User must own the image
-    - OPENAI_API_KEY configured in environment
-
-    Returns:
-    - List of AI-generated tags with confidence scores
-    - Tags are automatically saved to database (source='ai')
-    """
-    # 1. Get image metadata and verify ownership
-    image = await service.get_by_id(image_id)
-
-    if not image:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message=f"Image with ID '{image_id}' not found",
-            ).model_dump(),
-        )
-
-    # 2. Verify user owns this image
-    if image.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail=ErrorDetail(
-                code="FORBIDDEN",
-                message="You do not own this image",
-            ).model_dump(),
-        )
-
-    # 3. Fetch image bytes from storage
-    result = await service.get_file(image_id)
-    if not result:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=ErrorDetail(
-                code=ErrorCodes.IMAGE_NOT_FOUND,
-                message="Image file not found in storage",
-            ).model_dump(),
-        )
-
-    image_bytes, _, _ = result
-
-    # 4. Call AI provider (with graceful degradation)
-    try:
-        ai_provider = create_ai_provider(settings)
-        tags = await ai_provider.analyze_image(image_bytes)
-    except AIProviderError as e:
-        # Graceful degradation: Don't break UX when AI fails
-        # This is especially important for quota errors, API downtime, etc.
-        print(f"AI provider failed for image {image_id}: {e}")
-        return {
-            "message": "Image is ready, but AI tagging is temporarily unavailable",
-            "image_id": image_id,
-            "tags": [],
-            "provider": settings.ai_provider,
-            "model": settings.openai_vision_model if settings.ai_provider == "openai" else None,
-            "error": str(e),
-            "suggestion": "Try again later or switch to mock provider (AI_PROVIDER=mock)",
-        }
-
-    # 5. Save tags to database
-    tag_service = TagService(db=db)
-    saved_tags = []
-
-    for tag in tags:
-        try:
-            await tag_service.add_tag_to_image(
-                image_id=image_id,
-                tag_name=tag.name,
-                source="ai",
-                confidence=tag.confidence,
-                category=tag.category,
-            )
-            saved_tags.append(
-                {
-                    "name": tag.name,
-                    "confidence": tag.confidence,
-                    "category": tag.category,
-                }
-            )
-        except Exception as e:
-            # Log error but continue with other tags
-            print(f"Failed to save tag {tag.name}: {e}")
-
-    # 6. Return results
-    return {
-        "message": f"Added {len(saved_tags)} AI tags to image",
-        "image_id": image_id,
-        "tags": saved_tags,
-        "provider": settings.ai_provider,
-        "model": settings.openai_vision_model if settings.ai_provider == "openai" else None,
-    }
