@@ -180,6 +180,19 @@ class ImageService:
         )
         return list(result.scalars().all())
 
+    async def get_total_image_count(self) -> int:
+        """
+        Get total number of images across all users (for landing page stats).
+
+        Returns:
+            Total count of images in the database
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.count(Image.id))
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
+
     async def get_by_id(self, image_id: str, use_cache: bool = True) -> Image | None:
         """
         Get image metadata by ID with optional caching.

@@ -15,35 +15,123 @@ from app.models.image import Image
 from app.services.auth_service import AuthService
 
 
-class TestPublicPages:
-    """Tests for public pages accessible without authentication.
-
-    Note: Per FR-4.1, the home page now requires authentication.
-    Anonymous users are redirected to login.
-    """
+class TestLandingPage:
+    """Tests for landing page at / (anonymous users)."""
 
     @pytest.mark.asyncio
-    async def test_home_page_redirects_anonymous_to_login(self, client: AsyncClient):
-        """Home page should redirect anonymous users to login (FR-4.1 unlisted model)."""
-        response = await client.get("/", follow_redirects=False)
+    async def test_landing_page_anonymous_user(self, client: AsyncClient):
+        """Anonymous users see landing page at /."""
+        response = await client.get("/")
 
-        assert response.status_code == 302
-        assert response.headers["location"] == "/login"
+        assert response.status_code == 200
+        assert "text/html" in response.headers["content-type"]
+        assert "చిత్రం" in response.text  # Logo in Telugu
+        assert "What will you upload today?" in response.text
+        assert "Get Started Free" in response.text
+        assert "Platform Stats" in response.text
 
     @pytest.mark.asyncio
-    async def test_home_page_returns_200_for_authenticated(self, client: AsyncClient, test_deps):
-        """Home page should return 200 for authenticated users."""
-        from app.services.auth_service import AuthService
-
+    async def test_landing_page_shows_live_stats(self, client: AsyncClient, test_deps):
+        """Landing page shows live stats (images, users)."""
+        # Create test data
         auth_service = AuthService(test_deps.session)
-        user = await auth_service.create_user("homeuser@example.com", "password123")
+        await auth_service.create_user("statsuser@example.com", "password123")
+
+        # Anonymous user views landing
+        response = await client.get("/")
+
+        assert response.status_code == 200
+        # Stats should show in HTML
+        assert "Images Hosted" in response.text
+        assert "Active Users" in response.text
+
+    @pytest.mark.asyncio
+    async def test_landing_page_authenticated_user_redirects(self, client: AsyncClient, test_deps):
+        """Authenticated users are redirected from / to /gallery."""
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("redirect@example.com", "password123")
         token = auth_service.create_access_token(user.id)
 
-        response = await client.get("/", cookies={AUTH_COOKIE_NAME: token})
+        response = await client.get("/", cookies={AUTH_COOKIE_NAME: token}, follow_redirects=False)
+
+        assert response.status_code == 302
+        assert response.headers["location"] == "/gallery"
+
+
+class TestGalleryRoute:
+    """Tests for /gallery route (authenticated users)."""
+
+    @pytest.mark.asyncio
+    async def test_gallery_requires_authentication(self, client: AsyncClient):
+        """Anonymous users redirected to login."""
+        response = await client.get("/gallery", follow_redirects=False)
+
+        assert response.status_code == 302
+        assert "/login" in response.headers["location"]
+
+    @pytest.mark.asyncio
+    async def test_gallery_shows_user_images(self, client: AsyncClient, test_deps):
+        """Authenticated users see their gallery."""
+        auth_service = AuthService(test_deps.session)
+        user = await auth_service.create_user("gallery@example.com", "password123")
+        token = auth_service.create_access_token(user.id)
+
+        response = await client.get("/gallery", cookies={AUTH_COOKIE_NAME: token})
 
         assert response.status_code == 200
         assert "text/html" in response.headers["content-type"]
         assert "Chitram" in response.text  # Brand name in nav
+
+    @pytest.mark.asyncio
+    async def test_gallery_only_shows_own_images(
+        self, client: AsyncClient, test_deps, sample_jpeg_bytes
+    ):
+        """Gallery shows only user's own images (FR-4.1)."""
+        auth_service = AuthService(test_deps.session)
+
+        # User 1 uploads image
+        user1 = await auth_service.create_user("user1@example.com", "password123")
+        img1 = Image(
+            filename="user1.jpg",
+            content_type="image/jpeg",
+            file_size=len(sample_jpeg_bytes),
+            storage_key="user1-key.jpg",
+            upload_ip="127.0.0.1",
+            user_id=user1.id,
+        )
+        test_deps.session.add(img1)
+
+        # User 2 uploads image
+        user2 = await auth_service.create_user("user2@example.com", "password123")
+        img2 = Image(
+            filename="user2.jpg",
+            content_type="image/jpeg",
+            file_size=len(sample_jpeg_bytes),
+            storage_key="user2-key.jpg",
+            upload_ip="127.0.0.1",
+            user_id=user2.id,
+        )
+        test_deps.session.add(img2)
+        await test_deps.session.commit()
+        await test_deps.session.refresh(img1)
+        await test_deps.session.refresh(img2)
+
+        # User 1's gallery should only show img1
+        token1 = auth_service.create_access_token(user1.id)
+        response = await client.get("/gallery", cookies={AUTH_COOKIE_NAME: token1})
+
+        assert response.status_code == 200
+        assert (
+            str(img1.id) in response.text
+            or "user1.jpg" in response.text
+            or "user1-key" in response.text
+        )
+        # Should NOT show user2's images
+        assert str(img2.id) not in response.text
+
+
+class TestPublicPages:
+    """Tests for public pages accessible without authentication."""
 
     @pytest.mark.asyncio
     async def test_login_page_returns_200(self, client: AsyncClient):
@@ -327,29 +415,29 @@ class TestNavigation:
     """Tests for navigation elements."""
 
     @pytest.mark.asyncio
-    async def test_nav_shows_login_when_anonymous(self, client: AsyncClient):
-        """Navigation should show login link for anonymous users on login page."""
-        # Use login page since home page now redirects anonymous users
-        response = await client.get("/login")
+    async def test_nav_anonymous_shows_home_link(self, client: AsyncClient):
+        """Anonymous users see 'Home' link in nav."""
+        response = await client.get("/login")  # Use login page to test nav
 
         assert response.status_code == 200
-        assert "login" in response.text.lower() or "sign in" in response.text.lower()
+        assert "Home" in response.text
+        assert "Login" in response.text
+        assert "Register" in response.text
 
     @pytest.mark.asyncio
-    async def test_nav_shows_profile_when_authenticated(self, client: AsyncClient, test_deps):
-        """Navigation should show profile/user info for authenticated users."""
+    async def test_nav_authenticated_shows_gallery_link(self, client: AsyncClient, test_deps):
+        """Authenticated users see 'My Gallery' link in nav."""
         auth_service = AuthService(test_deps.session)
         user = await auth_service.create_user("nav@example.com", "password123")
         token = auth_service.create_access_token(user.id)
 
-        response = await client.get(
-            "/",
-            cookies={AUTH_COOKIE_NAME: token},
-        )
+        response = await client.get("/gallery", cookies={AUTH_COOKIE_NAME: token})
 
         assert response.status_code == 200
-        # Should show user email or profile link, not login link
-        assert "nav@example.com" in response.text or "my-images" in response.text.lower()
+        assert "My Gallery" in response.text
+        assert "Logout" in response.text
+        # Login/Register should NOT be shown when authenticated
+        assert response.text.count("Login") <= 1  # May appear in footer/elsewhere but not in nav
 
 
 class TestErrorPages:

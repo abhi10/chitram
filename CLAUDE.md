@@ -116,6 +116,17 @@ Self-contained context for debugging Chitram issues. Located at `.claude/agents/
 - `GET /health` - Health check
 - `GET /docs` - Swagger UI
 
+## Web UI Routes
+- `GET /` - Landing page (anonymous) or redirect to `/gallery` (authenticated)
+- `GET /gallery` - User's personal gallery (requires auth)
+- `GET /login` - Login page
+- `GET /register` - Registration page
+- `POST /logout` - Logout and clear auth cookie
+- `GET /upload` - Upload form (requires auth)
+- `GET /image/{image_id}` - Image detail page
+- `GET /my-images` - User's image collection (alias for `/gallery`)
+- `GET /partials/gallery` - HTMX infinite scroll partial
+
 ## Documentation
 
 ### Planning & Requirements
@@ -326,6 +337,9 @@ grep -r "AuthService\|verify_token" --include="*.py" app/
 | Storage abstraction | `backend/app/services/storage_service.py` | Strategy pattern for storage |
 | Validation | `backend/app/utils/validation.py` | Magic bytes, file type checking |
 | API routes | `backend/app/api/images.py` | CRUD endpoints |
+| Web UI routes | `backend/app/api/web.py` | Server-rendered HTML pages |
+| Landing page | `backend/app/templates/landing.html` | Welcoming page for new users |
+| User gallery | `backend/app/templates/gallery.html` | Personal image gallery (renamed from home.html) |
 | Test fixtures | `backend/tests/conftest.py` | Test DB, storage, client |
 | Test suite | `backend/tests/api/test_images.py` | API integration tests |
 

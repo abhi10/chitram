@@ -98,19 +98,64 @@ def get_templates(request: Request):
 
 
 @router.get("/", response_class=HTMLResponse)
-async def home(
+async def landing_page(
+    request: Request,
+    user: User | None = Depends(get_current_user_from_cookie),
+):
+    """
+    Landing page for anonymous users, redirect to gallery for authenticated users.
+
+    This preserves existing user experience - authenticated users get redirected
+    to their gallery, while new visitors see a welcoming landing page.
+    """
+    if user:
+        # Authenticated users go straight to their gallery
+        return RedirectResponse(url="/gallery", status_code=302)
+
+    # Anonymous users see the landing page
+    # Fetch live stats for landing page (using session maker from app.state for test/prod decoupling)
+    from app.services.auth_service import AuthService
+
+    # Create new DB session for stats queries
+    async with request.app.state.db_session_maker() as db:
+        try:
+            image_service = ImageService(db=db, storage=request.app.state.storage)
+            auth_service = AuthService(db=db)
+
+            total_images = await image_service.get_total_image_count()
+            total_users = await auth_service.get_total_user_count()
+        except Exception:
+            # Graceful degradation if stats fail
+            total_images = 0
+            total_users = 0
+
+    templates = get_templates(request)
+    return templates.TemplateResponse(
+        request=request,
+        name="landing.html",
+        context={
+            "user": None,
+            "total_images": total_images,
+            "total_users": total_users,
+        },
+    )
+
+
+@router.get("/gallery", response_class=HTMLResponse)
+async def gallery(
     request: Request,
     service: ImageService = Depends(get_image_service),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Home page - User's gallery (requires auth per FR-4.1 unlisted model).
+    """
+    User's personal gallery (requires authentication).
 
-    Per FR-4.1: System shall NOT provide a public listing of all images.
-    Images are unlisted - accessible only by direct URL or from owner's gallery.
+    This is the renamed home page - shows only the authenticated user's images
+    per FR-4.1 unlisted model (no public listing).
     """
     if not user:
-        # Redirect anonymous users to login
-        return RedirectResponse(url="/login", status_code=302)
+        # Redirect anonymous users to login with return URL
+        return RedirectResponse(url="/login?next=/gallery", status_code=302)
 
     # Show only the authenticated user's images
     images = await service.list_by_user(user.id)
@@ -118,7 +163,7 @@ async def home(
 
     return templates.TemplateResponse(
         request=request,
-        name="home.html",
+        name="gallery.html",  # Renamed from home.html
         context={"images": images, "user": user, "image_count": len(images)},
     )
 
