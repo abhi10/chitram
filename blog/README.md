@@ -34,15 +34,30 @@ blog/
 
 ### 2026
 
-1. **[Debugging Cascading Infrastructure Failures: A Phase 6 Deployment Story](2026/01-phase6-deployment-debugging.md)**
+1. **[Debugging Cascading Infrastructure Failures: A Phase 6 Deployment Story](2026/02-phase6-deployment-debugging.md)**
    - *January 12, 2026*
    - Tags: #deployment #debugging #celery #redis #infrastructure
    - 5 cascading bugs from Celery deployment, systematic debugging approach
 
-2. **[The Storage Factory Pattern: How Code Duplication Caused a Production Bug](2026/02-storage-factory-pattern.md)**
+2. **[The Storage Factory Pattern: How Code Duplication Caused a Production Bug](2026/03-storage-factory-pattern.md)**
    - *January 12, 2026*
    - Tags: #design-patterns #dry-principle #refactoring #production-bugs
    - Storage backend mismatch between app and worker, factory pattern fix
+
+3. **[Building an AI Provider System: The Strategy Pattern for Vision APIs (Part 1 of 3)](2026/04a-ai-vision-part1-provider-system.md)**
+   - *January 13, 2026*
+   - Tags: #ai #strategy-pattern #architecture #openai #vision-api
+   - Swappable AI providers (OpenAI, Google, Mock) using Strategy pattern, factory-driven switching
+
+4. **[From Manual to Automatic: The Phase 5→6 Evolution (Part 2 of 3)](2026/04b-ai-vision-part2-manual-to-automatic.md)**
+   - *January 13, 2026*
+   - Tags: #ai #celery #architecture #incremental-development #fastapi
+   - Why we built manual endpoint first, then added Celery for automatic tagging, incremental complexity approach
+
+5. **[Deployment Debugging: How Code Duplication Caused a Production Bug (Part 3 of 3)](2026/04c-ai-vision-part3-deployment-debugging.md)**
+   - *January 13, 2026*
+   - Tags: #deployment #debugging #dry-principle #production-bugs #refactoring
+   - 5 cascading infrastructure bugs, storage backend mismatch, Storage Factory Pattern fix
 
 ## Writing Guidelines
 
@@ -93,7 +108,7 @@ blog/
 - [ ] Test Dependency Container Pattern (ADR-0014)
 - [ ] From 11 to 355 Tests: Growing Test Suite Sustainably
 - [ ] Web UI with HTMX: Modern Without the JavaScript Fatigue
-- [ ] Pluggable AI Providers: OpenAI + Fallback Chain
+- [x] ~~Adding AI Vision to Image Host~~ (Published: 3-part series - Provider System, Manual→Automatic, Deployment Debugging)
 
 ### Ideas
 
