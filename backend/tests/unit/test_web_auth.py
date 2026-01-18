@@ -226,26 +226,26 @@ class TestPrivateGallery:
     """
 
     @pytest.mark.asyncio
-    async def test_home_redirects_anonymous_to_login(self):
-        """Home page should redirect anonymous users to login."""
-        from app.api.web import home
+    async def test_gallery_redirects_anonymous_to_login(self):
+        """Gallery page should redirect anonymous users to login."""
+        from app.api.web import gallery
 
         request = MagicMock()
         service = AsyncMock()
 
         # user=None means anonymous
-        response = await home(request=request, service=service, user=None)
+        response = await gallery(request=request, service=service, user=None)
 
         # Should redirect to login
         assert response.status_code == 302
-        assert response.headers["location"] == "/login"
+        assert response.headers["location"] == "/login?next=/gallery"
         # Should NOT call list_recent (which shows all images)
         service.list_recent.assert_not_called()
 
     @pytest.mark.asyncio
-    async def test_home_shows_only_users_own_images(self):
-        """Authenticated users should only see their own images."""
-        from app.api.web import home
+    async def test_gallery_shows_only_users_own_images(self):
+        """Authenticated users in gallery should only see their own images."""
+        from app.api.web import gallery
 
         request = MagicMock()
         request.app.state.templates = MagicMock()
@@ -261,7 +261,7 @@ class TestPrivateGallery:
         user.id = "user-123"
         user.email = "test@example.com"
 
-        await home(request=request, service=service, user=user)
+        await gallery(request=request, service=service, user=user)
 
         # Should call list_by_user with user's ID
         service.list_by_user.assert_called_once_with("user-123")

@@ -134,6 +134,9 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     # Store templates in app.state for web routes (single source of truth)
     app.state.templates = templates
 
+    # Store DB session maker for routes that need direct session creation (e.g., landing page stats)
+    app.state.db_session_maker = async_session_maker
+
     print("✅ Image Hosting API ready!")
 
     yield

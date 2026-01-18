@@ -101,6 +101,19 @@ class AuthService:
         result = await self.db.execute(select(User).where(User.id == user_id))
         return result.scalar_one_or_none()
 
+    async def get_total_user_count(self) -> int:
+        """
+        Get total number of active users (for landing page stats).
+
+        Returns:
+            Total count of active users in the database
+        """
+        from sqlalchemy import func
+
+        stmt = select(func.count(User.id)).where(User.is_active == True)  # noqa: E712
+        result = await self.db.execute(stmt)
+        return result.scalar_one()
+
     async def create_user(self, email: str, password: str) -> User:
         """Create a new user with hashed password."""
         password_hash = self.hash_password(password)

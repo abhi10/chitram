@@ -23,7 +23,29 @@ A production-ready image hosting application built with FastAPI, featuring a web
 
 ## Quick Start
 
-### Using GitHub Codespaces (Recommended)
+### Local Development with Docker (Recommended)
+
+**Prerequisites:** Docker Desktop installed and running
+
+```bash
+# From project root - starts everything with Docker
+./start-server.sh
+```
+
+This single command starts:
+- ✅ PostgreSQL database
+- ✅ MinIO object storage
+- ✅ Redis cache
+- ✅ FastAPI application with auto-reload
+
+Then open **http://localhost:8000/** in your browser to test the new landing page!
+
+**Stop the server:**
+```bash
+./stop-server.sh
+```
+
+### Using GitHub Codespaces (Cloud Development)
 
 **Zero local setup required!**
 

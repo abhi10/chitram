@@ -227,6 +227,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     app.state.rate_limiter = test_deps.rate_limiter
     app.state.upload_semaphore = test_deps.upload_semaphore
     app.state.templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+    app.state.db_session_maker = test_deps.session_maker  # For landing page stats
 
     # Also set the module-level globals for dependencies that use them
     set_cache(test_deps.cache)
@@ -246,6 +247,7 @@ async def client(test_deps: TestDependencies) -> AsyncGenerator[AsyncClient, Non
     app.state.rate_limiter = None
     app.state.upload_semaphore = None
     app.state.templates = None
+    app.state.db_session_maker = None
     set_cache(None)
     set_rate_limiter(None)
     set_upload_semaphore(None)

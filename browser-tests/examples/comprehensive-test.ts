@@ -109,20 +109,28 @@ async function main() {
       await browser.waitForSelector('footer', { timeout: 5000 })
     })
 
-    await runTest('UI Elements', 'Home page shows correct state (gallery or empty)', async () => {
+    await runTest('UI Elements', 'Home page shows landing page for anonymous users', async () => {
       await browser.navigate(BASE_URL)
-      // Page should show either gallery grid (with images) or empty state (no images)
+      // Anonymous users should see landing page with welcome message
       const html = await browser.getVisibleHtml()
-      const hasGallery = html.includes('masonry-grid')
-      const hasEmptyState = html.includes('No images yet')
-      if (!hasGallery && !hasEmptyState) {
-        throw new Error('Home page shows neither gallery nor empty state')
+      const hasWelcome = html.includes('What will you upload today?') || html.includes('చిత్రం')
+      if (!hasWelcome) {
+        throw new Error('Home page does not show landing page content')
       }
     })
 
-    await runTest('UI Elements', 'Upload link present in nav', async () => {
+    await runTest('UI Elements', 'Landing page navigation for anonymous users', async () => {
       await browser.navigate(BASE_URL)
-      await browser.waitForSelector('a[href="/upload"]', { timeout: 5000 })
+      // Anonymous users should see Home, GitHub, Login, Register (but NOT Upload)
+      await browser.waitForSelector('a[href="/"]', { timeout: 5000 }) // Home link
+      await browser.waitForSelector('a[href="/login"]', { timeout: 5000 }) // Login link
+      await browser.waitForSelector('a[href="/register"]', { timeout: 5000 }) // Register link
+
+      // Upload link should NOT be visible for anonymous users
+      const uploadLinks = await browser.page.locator('a[href="/upload"]').count()
+      if (uploadLinks > 0) {
+        throw new Error('Upload link should not be visible for anonymous users')
+      }
     })
 
     // =========================================================================
