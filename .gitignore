@@ -44,6 +44,9 @@ Thumbs.db
 uploads/
 *.log
 
+# Blog archives
+docs/blog/archive/
+
 # uv
 .uv/
 uv.lock
