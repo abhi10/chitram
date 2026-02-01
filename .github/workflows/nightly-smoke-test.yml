@@ -18,6 +18,11 @@ on:
         required: false
         default: 'arajubuild@gmail.com'
 
+# Principle of least privilege: explicit minimal permissions
+permissions:
+  contents: read      # Read repository code (checkout)
+  issues: write       # Create incident issues on failure
+
 jobs:
   smoke-test:
     runs-on: ubuntu-latest
