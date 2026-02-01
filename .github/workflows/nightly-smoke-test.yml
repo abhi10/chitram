@@ -1,0 +1,115 @@
+name: Nightly Smoke Test
+
+on:
+  schedule:
+    # Run at 2 AM UTC daily (off-peak time)
+    # Cron format: minute hour day month weekday
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test'
+        required: false
+        default: 'https://chitram.io'
+      alert_email:
+        description: 'Email for alerts'
+        required: false
+        default: 'arajubuild@gmail.com'
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    name: Production Health Check
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: browser-tests
+        run: bun install
+
+      - name: Run nightly smoke test
+        working-directory: browser-tests
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://chitram.io' }}
+          ALERT_EMAIL: ${{ github.event.inputs.alert_email || 'arajubuild@gmail.com' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run examples/nightly-smoke-test.ts
+
+      - name: Send email on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: '🚨 Nightly Smoke Test Failed - Website Down!'
+          to: arajubuild@gmail.com
+          from: 'Chitram Health Check <noreply@chitram.io>'
+          body: |
+            Website Health Check FAILED
+            ═════════════════════════════════════════════
+
+            Website: https://chitram.io
+            Time: ${{ job.created_at }}
+
+            The nightly smoke test has detected that the website is down.
+
+            IMMEDIATE ACTIONS REQUIRED:
+            1. Check Supabase dashboard (https://supabase.com/dashboard)
+               - Verify project status
+               - Check if resources were paused
+               - Check billing status
+            2. Check server status/uptime
+            3. Check database connectivity
+            4. Check storage backend (MinIO/S3)
+
+            Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This is an automated health check alert from your CI/CD system.
+            Please address this immediately to minimize downtime.
+
+      - name: Create GitHub issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '[INCIDENT] Website Health Check Failed',
+              labels: ['incident', 'priority-high'],
+              body: 'Nightly Smoke Test Failed\n\nThe automated health check detected the website is down.\n\nPossible causes:\n- Supabase resources paused\n- Database connection issues\n- Storage backend unavailable\n\nSee workflow run for details.'
+            })
+
+      - name: Slack notification on failure
+        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
+        uses: slackapi/slack-github-action@v1.24.0
+        with:
+          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
+          payload: |
+            {
+              "text": "🚨 Website Health Check Failed",
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "🚨 *Nightly Smoke Test Failed*\n*Website:* https://chitram.io\n*Time:* ${{ job.created_at }}\n\nThe website appears to be down. Check Supabase dashboard immediately!"
+                  }
+                }
+              ]
+            }
+
+      - name: Success notification
+        if: success()
+        run: echo "✅ Nightly smoke test passed - website is healthy"
