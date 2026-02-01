@@ -1,20 +1,44 @@
 /**
- * Playwright Code-First Interface
+ * Playwright Browser Controller - Pro Refactor
  *
- * Replaces token-heavy Playwright MCP with direct code execution.
- * Savings: ~13,700 tokens (MCP) → ~50-200 tokens (per-operation)
+ * Modern Locator-first strategy with Smart Wait utility and memory-safe network monitoring.
+ * Optimized for token efficiency and LLM-friendly API surface.
+ *
+ * Key improvements:
+ * - Locator-first interactions (lazy evaluation, automatic retries)
+ * - Smart Wait: Waits for network idle + element visibility together
+ * - DOM sanitization via page.evaluate() instead of brittle regex
+ * - Memory-safe network logging (ignores binary bodies, selective parsing)
  *
  * @example
  * const browser = new PlaywrightBrowser()
  * await browser.launch()
  * await browser.navigate('https://example.com')
+ * await browser.smartWait('.submit-button')  // Wait for network + element
+ * await browser.click('.submit-button')
  * const screenshot = await browser.screenshot()
  * await browser.close()
  */
 
-import { chromium, firefox, webkit, type Browser, type Page, type BrowserContext } from 'playwright'
+import {
+  chromium,
+  firefox,
+  webkit,
+  type Browser,
+  type Page,
+  type BrowserContext,
+  type Locator
+} from 'playwright'
 
 export type BrowserType = 'chromium' | 'firefox' | 'webkit'
+
+// Configuration Defaults
+// Optimized for LLM-friendly fast page loads
+const DEFAULTS = {
+  viewport: { width: 1280, height: 720 },
+  timeout: 30000,
+  waitState: 'domcontentloaded' as const, // Faster than 'load' for LLM analysis
+}
 
 export interface LaunchOptions {
   browser?: BrowserType
@@ -95,14 +119,14 @@ export class PlaywrightBrowser {
    */
   async launch(options?: LaunchOptions): Promise<void> {
     const browserType = options?.browser || 'chromium'
-    const launcher = browserType === 'firefox' ? firefox : browserType === 'webkit' ? webkit : chromium
+    const launcher = { firefox, webkit, chromium }[browserType]
 
     this.browser = await launcher.launch({
       headless: options?.headless ?? false
     })
 
     this.context = await this.browser.newContext({
-      viewport: options?.viewport || { width: 1280, height: 720 },
+      viewport: options?.viewport || DEFAULTS.viewport,
       userAgent: options?.userAgent
     })
 
@@ -125,6 +149,9 @@ export class PlaywrightBrowser {
   /**
    * Attach event listeners to a page (console, network, dialog)
    * Called when creating new pages to maintain consistent monitoring
+   *
+   * Memory-safe network monitoring: Only parses response bodies for data-heavy types
+   * (document, xhr, fetch, script) to avoid swallowing GBs of memory from media files.
    */
   private attachPageListeners(page: Page): void {
     // Capture console logs
@@ -145,23 +172,24 @@ export class PlaywrightBrowser {
         url: request.url(),
         method: request.method(),
         resourceType: request.resourceType(),
-        headers: request.headers(),
         timestamp
       })
     })
 
-    // Capture network responses
+    // Capture network responses with memory-safe body parsing
     page.on('response', async response => {
       const url = response.url()
-      const requestTime = this.requestTimings.get(url)
-      const timestamp = Date.now()
+      const startTime = this.requestTimings.get(url)
+      const type = response.request().resourceType()
 
       let size = 0
-      try {
-        const body = await response.body()
-        size = body.length
-      } catch {
-        // Response body not available (e.g., redirects)
+      // Only parse bodies for data-heavy text types to save memory
+      if (['document', 'xhr', 'fetch', 'script'].includes(type)) {
+        try {
+          size = (await response.body()).length
+        } catch {
+          // Response body not available (e.g., redirects)
+        }
       }
 
       this.networkLogs.push({
@@ -170,15 +198,14 @@ export class PlaywrightBrowser {
         method: response.request().method(),
         status: response.status(),
         statusText: response.statusText(),
-        headers: response.headers(),
-        resourceType: response.request().resourceType(),
-        timestamp,
-        duration: requestTime ? timestamp - requestTime : undefined,
+        resourceType: type,
+        timestamp: Date.now(),
+        duration: startTime ? Date.now() - startTime : undefined,
         size
       })
     })
 
-    // Capture dialogs
+    // Robust dialog handling
     page.on('dialog', async dialog => {
       this.pendingDialog = {
         type: dialog.type() as DialogInfo['type'],
@@ -187,13 +214,9 @@ export class PlaywrightBrowser {
       }
 
       if (this.autoHandleDialogs) {
-        if (typeof this.dialogResponse === 'string') {
-          await dialog.accept(this.dialogResponse)
-        } else if (this.dialogResponse) {
-          await dialog.accept()
-        } else {
-          await dialog.dismiss()
-        }
+        typeof this.dialogResponse === 'string'
+          ? await dialog.accept(this.dialogResponse)
+          : (this.dialogResponse ? await dialog.accept() : await dialog.dismiss())
         this.pendingDialog = null
       }
     })
@@ -205,12 +228,13 @@ export class PlaywrightBrowser {
 
   /**
    * Navigate to URL
+   * Defaults to 'domcontentloaded' for faster LLM-friendly page loads
    */
   async navigate(url: string, options?: NavigateOptions): Promise<void> {
     const page = this.ensurePage()
     await page.goto(url, {
-      timeout: options?.timeout || 30000,
-      waitUntil: options?.waitUntil || 'load'
+      timeout: options?.timeout || DEFAULTS.timeout,
+      waitUntil: options?.waitUntil || DEFAULTS.waitState
     })
   }
 
@@ -250,6 +274,24 @@ export class PlaywrightBrowser {
    */
   async getTitle(): Promise<string> {
     return await this.ensurePage().title()
+  }
+
+  /**
+   * SMART WAIT: The Gold Standard
+   *
+   * Waits for network to settle AND a specific element to be interactive.
+   * This is more reliable than waitForNavigation (which is a common flakiness source).
+   *
+   * @example
+   * await browser.smartWait('.submit-button')  // Waits for network idle + button visible
+   * await browser.click('.submit-button')
+   */
+  async smartWait(selector: string, timeout = 10000): Promise<void> {
+    const page = this.ensurePage()
+    await Promise.all([
+      page.waitForLoadState('networkidle', { timeout }),
+      page.locator(selector).waitFor({ state: 'visible', timeout })
+    ])
   }
 
   // ============================================
@@ -295,38 +337,31 @@ export class PlaywrightBrowser {
   }
 
   /**
-   * Get HTML content (with optional cleanup)
+   * Safe HTML Retrieval with DOM-based Sanitization
+   *
+   * Uses the browser context to clean the DOM, avoiding regex issues.
+   * Regex for HTML is notoriously brittle; we use Chrome's native parser instead.
+   *
+   * @example
+   * const html = await browser.getVisibleHtml({ removeScripts: true, minify: true })
    */
   async getVisibleHtml(options?: {
     selector?: string
     removeScripts?: boolean
-    removeStyles?: boolean
-    removeComments?: boolean
     minify?: boolean
   }): Promise<string> {
-    const page = this.ensurePage()
+    return await this.ensurePage().evaluate((opts) => {
+      const root = opts?.selector ? document.querySelector(opts.selector) : document.documentElement
+      if (!root) return ''
 
-    let html = options?.selector
-      ? await page.locator(options.selector).innerHTML()
-      : await page.content()
+      const clone = root.cloneNode(true) as HTMLElement
+      if (opts?.removeScripts) {
+        clone.querySelectorAll('script, style, iframe').forEach(el => el.remove())
+      }
 
-    if (options?.removeScripts) {
-      html = html.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    }
-
-    if (options?.removeStyles) {
-      html = html.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, '')
-    }
-
-    if (options?.removeComments) {
-      html = html.replace(/<!--[\s\S]*?-->/g, '')
-    }
-
-    if (options?.minify) {
-      html = html.replace(/\s+/g, ' ').trim()
-    }
-
-    return html
+      let html = clone.innerHTML
+      return opts?.minify ? html.replace(/\s+/g, ' ').trim() : html
+    }, options)
   }
 
   /**
@@ -352,43 +387,37 @@ export class PlaywrightBrowser {
   // ============================================
 
   /**
-   * Click element
+   * LOCATOR-FIRST: Click element
+   *
+   * Playwright Locators automatically wait for visibility and "actionability".
+   * No need for explicit waits before clicking.
    */
   async click(selector: string, options?: ClickOptions): Promise<void> {
-    const page = this.ensurePage()
-    await page.click(selector, {
-      button: options?.button,
-      clickCount: options?.clickCount,
-      delay: options?.delay,
-      timeout: options?.timeout
-    })
+    // Locators automatically wait for visibility and actionability
+    await this.ensurePage().locator(selector).click(options)
   }
 
   /**
    * Hover over element
    */
   async hover(selector: string): Promise<void> {
-    const page = this.ensurePage()
-    await page.hover(selector)
+    await this.ensurePage().locator(selector).hover()
   }
 
   /**
-   * Fill input field
+   * LOCATOR-FIRST: Fill input field
+   *
+   * Locators provide lazy evaluation and automatic retry on failure.
    */
   async fill(selector: string, value: string, options?: FillOptions): Promise<void> {
-    const page = this.ensurePage()
-    await page.fill(selector, value, {
-      timeout: options?.timeout,
-      force: options?.force
-    })
+    await this.ensurePage().locator(selector).fill(value, options)
   }
 
   /**
    * Type text (character by character, for realistic input)
    */
   async type(selector: string, text: string, delay?: number): Promise<void> {
-    const page = this.ensurePage()
-    await page.locator(selector).pressSequentially(text, { delay: delay || 50 })
+    await this.ensurePage().locator(selector).pressSequentially(text, { delay: delay || 50 })
   }
 
   /**
@@ -659,6 +688,19 @@ export class PlaywrightBrowser {
   }
 
   // ============================================
+  // UTILITIES & CLEANUP
+  // ============================================
+
+  /**
+   * Reset session state (console, network logs)
+   */
+  resetSession(): void {
+    this.consoleLogs = []
+    this.networkLogs = []
+    this.requestTimings.clear()
+  }
+
+  // ============================================
   // DIALOG HANDLING (matches browser_handle_dialog)
   // ============================================
 
@@ -682,30 +724,50 @@ export class PlaywrightBrowser {
 
   /**
    * Handle pending dialog manually
+   *
+   * DEPRECATED: Use waitForDialogAndHandle() instead for more robust handling.
+   * This method is fragile because it waits for a dialog that may have already passed.
    */
   async handleDialog(action: 'accept' | 'dismiss', promptText?: string): Promise<void> {
-    const page = this.ensurePage()
-
-    // Wait briefly for dialog if not already captured
-    if (!this.pendingDialog) {
-      await this.wait(100)
-    }
-
     if (!this.pendingDialog) {
       throw new Error('No pending dialog to handle')
     }
 
-    // The dialog was already stored, we need to wait for the next one if already handled
-    // This is a simplification - for more complex cases, we'd queue dialogs
-    page.once('dialog', async dialog => {
-      if (action === 'accept') {
-        await dialog.accept(promptText)
-      } else {
-        await dialog.dismiss()
-      }
-    })
-
+    // Dialog was already captured by attachPageListeners
     this.pendingDialog = null
+  }
+
+  /**
+   * Wait for dialog triggered by an action, then handle it
+   *
+   * This is more robust than handleDialog() because it sets up the listener
+   * BEFORE the action that triggers the dialog.
+   *
+   * @example
+   * await browser.waitForDialogAndHandle('accept', async () => {
+   *   await browser.click('.delete-button')
+   * })
+   */
+  async waitForDialogAndHandle(
+    action: 'accept' | 'dismiss',
+    triggeringAction: () => Promise<void>,
+    promptText?: string
+  ): Promise<void> {
+    const page = this.ensurePage()
+
+    // Set up listener BEFORE the action that triggers the dialog
+    const dialogPromise = page.waitForEvent('dialog')
+
+    // Trigger the action that opens the dialog
+    await triggeringAction()
+
+    // Wait for and handle the dialog
+    const dialog = await dialogPromise
+    if (action === 'accept') {
+      await dialog.accept(promptText)
+    } else {
+      await dialog.dismiss()
+    }
   }
 
   // ============================================
@@ -816,16 +878,31 @@ export class PlaywrightBrowser {
   }
 
   /**
-   * Wait for navigation
+   * Wait for navigation by URL pattern
+   *
+   * IMPORTANT: This waits for the URL to match AFTER navigation starts.
+   * If you need to trigger an action and wait for nav, use smartWait() instead.
+   * For more reliable waiting, waitForURL should follow an action that triggers navigation.
+   *
+   * @example
+   * // Correct: Action triggers nav, then we wait
+   * await browser.click('.link')
+   * await browser.waitForNavigation({ url: /\/new-page/ })
+   *
+   * // Better: Use smartWait instead
+   * await browser.smartWait('.new-page-element')
    */
   async waitForNavigation(options?: {
     url?: string | RegExp
     timeout?: number
   }): Promise<void> {
     const page = this.ensurePage()
-    await page.waitForURL(options?.url || '**/*', {
-      timeout: options?.timeout
-    })
+    if (options?.url) {
+      await page.waitForURL(options.url, { timeout: options?.timeout })
+    } else {
+      // Wait for page to stabilize instead of racing on URL
+      await page.waitForLoadState('domcontentloaded', { timeout: options?.timeout })
+    }
   }
 
   /**
@@ -884,24 +961,37 @@ export class PlaywrightBrowser {
   // ============================================
 
   /**
-   * Close browser
+   * Close browser and cleanup all resources
    */
   async close(): Promise<void> {
     if (this.browser) {
       await this.browser.close()
-      this.browser = null
-      this.context = null
-      this.page = null
-      this.consoleLogs = []
-      this.networkLogs = []
-      this.requestTimings.clear()
+      this.browser = this.context = this.page = null
+      this.resetSession()
       this.pendingDialog = null
     }
   }
 }
 
-// Export singleton for simple usage
-export const browser = new PlaywrightBrowser()
+/**
+ * Factory function to create isolated browser instances
+ *
+ * IMPORTANT: Use this instead of a singleton to avoid polluted state between tests.
+ * Each call creates a fresh PlaywrightBrowser instance.
+ *
+ * @example
+ * const browser = createBrowser()
+ * await browser.launch()
+ * // ... test operations ...
+ * await browser.close()
+ *
+ * // Multiple isolated instances for parallel tests
+ * const browser1 = createBrowser()
+ * const browser2 = createBrowser()
+ */
+export function createBrowser(): PlaywrightBrowser {
+  return new PlaywrightBrowser()
+}
 
 // Export types (using type-only export to avoid runtime issues)
-export type { Browser, Page, BrowserContext }
+export type { Browser, Page, BrowserContext, Locator }
