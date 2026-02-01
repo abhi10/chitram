@@ -1,0 +1,114 @@
+name: Nightly Smoke Test
+
+on:
+  schedule:
+    # Run at 2 AM UTC daily (off-peak time)
+    # Cron format: minute hour day month weekday
+    - cron: '0 2 * * *'
+
+  # Allow manual trigger for testing
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: 'Base URL to test'
+        required: false
+        default: 'https://chitram.io'
+      alert_email:
+        description: 'Email for alerts'
+        required: false
+        default: 'arajubuild@gmail.com'
+
+# Principle of least privilege: explicit minimal permissions
+permissions:
+  contents: read      # Read repository code (checkout)
+  issues: write       # Create incident issues on failure
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    name: Production Health Check
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        working-directory: browser-tests
+        run: bun install
+
+      - name: Install Playwright Browsers & System Dependencies
+        working-directory: browser-tests
+        run: bunx playwright install --with-deps chromium
+
+      - name: Run nightly smoke test
+        working-directory: browser-tests
+        env:
+          BASE_URL: ${{ github.event.inputs.base_url || 'https://chitram.io' }}
+          ALERT_EMAIL: ${{ github.event.inputs.alert_email || 'arajubuild@gmail.com' }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: bun run examples/nightly-smoke-test.ts
+
+      - name: Upload Failure Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-artifacts
+          path: browser-tests/test-results/
+          retention-days: 7
+
+      - name: Send email on failure
+        if: failure()
+        uses: dawidd6/action-send-mail@v3
+        with:
+          server_address: ${{ secrets.SMTP_SERVER }}
+          server_port: ${{ secrets.SMTP_PORT }}
+          username: ${{ secrets.SMTP_USERNAME }}
+          password: ${{ secrets.SMTP_PASSWORD }}
+          subject: '🚨 Nightly Smoke Test Failed - Website Down!'
+          to: ${{ github.event.inputs.alert_email || 'arajubuild@gmail.com' }}
+          from: 'Chitram Health Check <noreply@chitram.io>'
+          body: |
+            Website Health Check FAILED
+            ═════════════════════════════════════════════
+
+            Website: ${{ github.event.inputs.base_url || 'https://chitram.io' }}
+            Time: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            The nightly smoke test has detected that the website is down.
+
+            IMMEDIATE ACTIONS REQUIRED:
+            1. Check Supabase dashboard (https://supabase.com/dashboard)
+               - Verify project status
+               - Check if resources were paused
+               - Check billing status
+            2. Check server status/uptime
+            3. Check database connectivity
+            4. Check storage backend (MinIO/S3)
+
+            Workflow Run: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+
+            This is an automated health check alert from your CI/CD system.
+            Please address this immediately to minimize downtime.
+
+      - name: Create GitHub issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '[INCIDENT] Nightly Smoke Test Failed - Website Down',
+              labels: ['incident', 'priority-high'],
+              body: '🚨 Website Health Check Failed\n\nThe automated nightly smoke test detected a failure.\n\nQuick Actions:\n1. Check Supabase Dashboard (https://supabase.com/dashboard)\n2. Verify billing and resource status\n3. Check server logs and monitoring\n\nPossible Causes:\n- Supabase resources paused\n- Database connection issues\n- Storage backend unavailable\n- Network connectivity problems\n\nSee workflow run for detailed failure info.'
+            })
+
+      - name: Success notification
+        if: success()
+        run: echo "✅ Nightly smoke test passed - website is healthy"
