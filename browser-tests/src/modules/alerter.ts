@@ -94,6 +94,9 @@ async function alertViaEmail(
  * - Creates a record/history of incidents
  * - Integrates with GitHub workflow
  * - Can be assigned, labeled, etc.
+ *
+ * Security: Uses spawnSync with argument array to avoid shell injection.
+ * Arguments are passed directly to 'gh' CLI without shell interpolation.
  */
 async function alertViaGitHubIssue(
   payload: AlertPayload,
@@ -117,14 +120,25 @@ ${payload.metadata ? `**Metadata:**\n\`\`\`json\n${JSON.stringify(payload.metada
 
   // Use GitHub CLI if available
   try {
-    // This assumes gh CLI is available in the environment
-    const result = await import('child_process').then(m =>
-      m.execSync(
-        `gh issue create --title "${payload.title}" --body "${body.replace(/"/g, '\\"')}" --label "incident"`,
-        { cwd: process.cwd() }
-      )
-    )
-    console.log('📋 GitHub issue created:', result.toString())
+    // Use spawnSync with argument array instead of execSync with string
+    // This avoids shell injection vulnerabilities and brittle escaping
+    const { spawnSync } = await import('child_process')
+
+    const result = spawnSync('gh', ['issue', 'create', '--title', payload.title, '--body', body, '--label', 'incident'], {
+      cwd: process.cwd(),
+      encoding: 'utf8',
+    })
+
+    // Handle errors from spawnSync
+    if (result.error) {
+      throw result.error
+    }
+
+    if (result.status !== 0) {
+      throw new Error(`gh exited with code ${result.status}: ${result.stderr}`)
+    }
+
+    console.log('📋 GitHub issue created:', result.stdout)
   } catch (error) {
     console.warn('Failed to create GitHub issue:', error)
   }
