@@ -22,6 +22,7 @@ jobs:
   smoke-test:
     runs-on: ubuntu-latest
     name: Production Health Check
+    timeout-minutes: 10
 
     steps:
       - name: Checkout code
@@ -36,6 +37,10 @@ jobs:
         working-directory: browser-tests
         run: bun install
 
+      - name: Install Playwright Browsers & System Dependencies
+        working-directory: browser-tests
+        run: bunx playwright install --with-deps chromium
+
       - name: Run nightly smoke test
         working-directory: browser-tests
         env:
@@ -43,6 +48,14 @@ jobs:
           ALERT_EMAIL: ${{ github.event.inputs.alert_email || 'arajubuild@gmail.com' }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: bun run examples/nightly-smoke-test.ts
+
+      - name: Upload Failure Artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-test-artifacts
+          path: browser-tests/test-results/
+          retention-days: 7
 
       - name: Send email on failure
         if: failure()
@@ -53,14 +66,14 @@ jobs:
           username: ${{ secrets.SMTP_USERNAME }}
           password: ${{ secrets.SMTP_PASSWORD }}
           subject: '🚨 Nightly Smoke Test Failed - Website Down!'
-          to: arajubuild@gmail.com
+          to: ${{ github.event.inputs.alert_email || 'arajubuild@gmail.com' }}
           from: 'Chitram Health Check <noreply@chitram.io>'
           body: |
             Website Health Check FAILED
             ═════════════════════════════════════════════
 
-            Website: https://chitram.io
-            Time: ${{ job.created_at }}
+            Website: ${{ github.event.inputs.base_url || 'https://chitram.io' }}
+            Time: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
 
             The nightly smoke test has detected that the website is down.
 
@@ -86,9 +99,9 @@ jobs:
             github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
-              title: '[INCIDENT] Website Health Check Failed',
+              title: '[INCIDENT] Nightly Smoke Test Failed - Website Down',
               labels: ['incident', 'priority-high'],
-              body: 'Nightly Smoke Test Failed\n\nThe automated health check detected the website is down.\n\nPossible causes:\n- Supabase resources paused\n- Database connection issues\n- Storage backend unavailable\n\nSee workflow run for details.'
+              body: '🚨 Website Health Check Failed\n\nThe automated nightly smoke test detected a failure.\n\nQuick Actions:\n1. Check Supabase Dashboard (https://supabase.com/dashboard)\n2. Verify billing and resource status\n3. Check server logs and monitoring\n\nPossible Causes:\n- Supabase resources paused\n- Database connection issues\n- Storage backend unavailable\n- Network connectivity problems\n\nSee workflow run for detailed failure info.'
             })
 
       - name: Success notification
