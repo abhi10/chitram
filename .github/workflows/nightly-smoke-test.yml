@@ -91,25 +91,6 @@ jobs:
               body: 'Nightly Smoke Test Failed\n\nThe automated health check detected the website is down.\n\nPossible causes:\n- Supabase resources paused\n- Database connection issues\n- Storage backend unavailable\n\nSee workflow run for details.'
             })
 
-      - name: Slack notification on failure
-        if: failure() && secrets.SLACK_WEBHOOK_URL != ''
-        uses: slackapi/slack-github-action@v1.24.0
-        with:
-          webhook-url: ${{ secrets.SLACK_WEBHOOK_URL }}
-          payload: |
-            {
-              "text": "🚨 Website Health Check Failed",
-              "blocks": [
-                {
-                  "type": "section",
-                  "text": {
-                    "type": "mrkdwn",
-                    "text": "🚨 *Nightly Smoke Test Failed*\n*Website:* https://chitram.io\n*Time:* ${{ job.created_at }}\n\nThe website appears to be down. Check Supabase dashboard immediately!"
-                  }
-                }
-              ]
-            }
-
       - name: Success notification
         if: success()
         run: echo "✅ Nightly smoke test passed - website is healthy"
