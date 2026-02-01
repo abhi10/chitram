@@ -33,10 +33,11 @@ import {
 export type BrowserType = 'chromium' | 'firefox' | 'webkit'
 
 // Configuration Defaults
+// Optimized for LLM-friendly fast page loads
 const DEFAULTS = {
   viewport: { width: 1280, height: 720 },
   timeout: 30000,
-  waitState: 'domcontentloaded' as const,
+  waitState: 'domcontentloaded' as const, // Faster than 'load' for LLM analysis
 }
 
 export interface LaunchOptions {
@@ -227,12 +228,13 @@ export class PlaywrightBrowser {
 
   /**
    * Navigate to URL
+   * Defaults to 'domcontentloaded' for faster LLM-friendly page loads
    */
   async navigate(url: string, options?: NavigateOptions): Promise<void> {
     const page = this.ensurePage()
     await page.goto(url, {
-      timeout: options?.timeout || 30000,
-      waitUntil: options?.waitUntil || 'load'
+      timeout: options?.timeout || DEFAULTS.timeout,
+      waitUntil: options?.waitUntil || DEFAULTS.waitState
     })
   }
 
@@ -722,30 +724,50 @@ export class PlaywrightBrowser {
 
   /**
    * Handle pending dialog manually
+   *
+   * DEPRECATED: Use waitForDialogAndHandle() instead for more robust handling.
+   * This method is fragile because it waits for a dialog that may have already passed.
    */
   async handleDialog(action: 'accept' | 'dismiss', promptText?: string): Promise<void> {
-    const page = this.ensurePage()
-
-    // Wait briefly for dialog if not already captured
-    if (!this.pendingDialog) {
-      await this.wait(100)
-    }
-
     if (!this.pendingDialog) {
       throw new Error('No pending dialog to handle')
     }
 
-    // The dialog was already stored, we need to wait for the next one if already handled
-    // This is a simplification - for more complex cases, we'd queue dialogs
-    page.once('dialog', async dialog => {
-      if (action === 'accept') {
-        await dialog.accept(promptText)
-      } else {
-        await dialog.dismiss()
-      }
-    })
-
+    // Dialog was already captured by attachPageListeners
     this.pendingDialog = null
+  }
+
+  /**
+   * Wait for dialog triggered by an action, then handle it
+   *
+   * This is more robust than handleDialog() because it sets up the listener
+   * BEFORE the action that triggers the dialog.
+   *
+   * @example
+   * await browser.waitForDialogAndHandle('accept', async () => {
+   *   await browser.click('.delete-button')
+   * })
+   */
+  async waitForDialogAndHandle(
+    action: 'accept' | 'dismiss',
+    triggeringAction: () => Promise<void>,
+    promptText?: string
+  ): Promise<void> {
+    const page = this.ensurePage()
+
+    // Set up listener BEFORE the action that triggers the dialog
+    const dialogPromise = page.waitForEvent('dialog')
+
+    // Trigger the action that opens the dialog
+    await triggeringAction()
+
+    // Wait for and handle the dialog
+    const dialog = await dialogPromise
+    if (action === 'accept') {
+      await dialog.accept(promptText)
+    } else {
+      await dialog.dismiss()
+    }
   }
 
   // ============================================
@@ -856,16 +878,31 @@ export class PlaywrightBrowser {
   }
 
   /**
-   * Wait for navigation
+   * Wait for navigation by URL pattern
+   *
+   * IMPORTANT: This waits for the URL to match AFTER navigation starts.
+   * If you need to trigger an action and wait for nav, use smartWait() instead.
+   * For more reliable waiting, waitForURL should follow an action that triggers navigation.
+   *
+   * @example
+   * // Correct: Action triggers nav, then we wait
+   * await browser.click('.link')
+   * await browser.waitForNavigation({ url: /\/new-page/ })
+   *
+   * // Better: Use smartWait instead
+   * await browser.smartWait('.new-page-element')
    */
   async waitForNavigation(options?: {
     url?: string | RegExp
     timeout?: number
   }): Promise<void> {
     const page = this.ensurePage()
-    await page.waitForURL(options?.url || '**/*', {
-      timeout: options?.timeout
-    })
+    if (options?.url) {
+      await page.waitForURL(options.url, { timeout: options?.timeout })
+    } else {
+      // Wait for page to stabilize instead of racing on URL
+      await page.waitForLoadState('domcontentloaded', { timeout: options?.timeout })
+    }
   }
 
   /**
@@ -936,8 +973,25 @@ export class PlaywrightBrowser {
   }
 }
 
-// Export singleton for simple usage
-export const browser = new PlaywrightBrowser()
+/**
+ * Factory function to create isolated browser instances
+ *
+ * IMPORTANT: Use this instead of a singleton to avoid polluted state between tests.
+ * Each call creates a fresh PlaywrightBrowser instance.
+ *
+ * @example
+ * const browser = createBrowser()
+ * await browser.launch()
+ * // ... test operations ...
+ * await browser.close()
+ *
+ * // Multiple isolated instances for parallel tests
+ * const browser1 = createBrowser()
+ * const browser2 = createBrowser()
+ */
+export function createBrowser(): PlaywrightBrowser {
+  return new PlaywrightBrowser()
+}
 
 // Export types (using type-only export to avoid runtime issues)
-export type { Browser, Page, BrowserContext }
+export type { Browser, Page, BrowserContext, Locator }
