@@ -2,8 +2,15 @@
 
 This provider implements the existing authentication logic from
 auth_service.py, wrapped in the AuthProvider interface.
+
+Security features:
+- bcrypt password hashing (work factor 12)
+- JWT token generation with configurable expiry
+- Timing-safe password verification (prevents timing attacks)
+- Account lockout after N failed attempts (brute force protection)
 """
 
+import logging
 from datetime import UTC, datetime, timedelta
 
 import bcrypt as bcrypt_lib
@@ -20,6 +27,8 @@ from app.services.auth.base import (
     TokenPair,
     UserInfo,
 )
+
+logger = logging.getLogger(__name__)
 
 # bcrypt work factor 12 (takes ~200-400ms to hash)
 BCRYPT_WORK_FACTOR = 12
@@ -136,12 +145,40 @@ class LocalAuthProvider(AuthProvider):
 
         return self._user_to_info(user)
 
+    async def _increment_failed_attempts(self, user: User) -> None:
+        """Increment failed login counter and lock account if threshold reached."""
+        user.failed_login_attempts += 1
+
+        if user.failed_login_attempts >= self._settings.max_failed_login_attempts:
+            user.locked_until = datetime.now(UTC) + timedelta(
+                minutes=self._settings.account_lockout_minutes
+            )
+            logger.warning(
+                f"Account locked for {user.email} after {user.failed_login_attempts} "
+                f"failed attempts. Locked until {user.locked_until}"
+            )
+
+        await self._db.commit()
+
+    async def _reset_failed_attempts(self, user: User) -> None:
+        """Reset failed login counter on successful login."""
+        if user.failed_login_attempts > 0 or user.locked_until is not None:
+            user.failed_login_attempts = 0
+            user.locked_until = None
+            await self._db.commit()
+
     async def login(
         self,
         email: str,
         password: str,
     ) -> tuple[UserInfo, TokenPair] | AuthError:
-        """Authenticate user and return tokens."""
+        """Authenticate user and return tokens.
+
+        Security features:
+        - Timing-safe user enumeration prevention
+        - Account lockout after max_failed_login_attempts failures
+        - Automatic unlock after account_lockout_minutes
+        """
         user = await self._get_user_by_email(email)
 
         if user is None:
@@ -152,7 +189,19 @@ class LocalAuthProvider(AuthProvider):
                 message="Invalid email or password",
             )
 
+        # Check if account is locked
+        if user.is_locked():
+            remaining = user.locked_until - datetime.now(UTC)
+            remaining_minutes = max(1, int(remaining.total_seconds() / 60))
+            logger.warning(f"Login attempt on locked account: {email}")
+            return AuthError(
+                code=AuthErrorCode.ACCOUNT_LOCKED,
+                message=f"Account is locked. Try again in {remaining_minutes} minutes.",
+            )
+
         if not self._verify_password(password, user.password_hash):
+            # Increment failed attempts counter
+            await self._increment_failed_attempts(user)
             return AuthError(
                 code=AuthErrorCode.INVALID_CREDENTIALS,
                 message="Invalid email or password",
@@ -163,6 +212,9 @@ class LocalAuthProvider(AuthProvider):
                 code=AuthErrorCode.USER_INACTIVE,
                 message="User account is inactive",
             )
+
+        # Successful login - reset failed attempts counter
+        await self._reset_failed_attempts(user)
 
         access_token = self._create_access_token(user.id)
         token_pair = TokenPair(

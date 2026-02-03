@@ -220,7 +220,9 @@ async def upload_image(
     responses={
         200: {"model": ImageMetadata},
         404: {"model": ErrorResponse, "description": "Image not found"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
+    dependencies=[Depends(check_rate_limit)],
 )
 async def get_image_metadata(
     image_id: str,
@@ -270,7 +272,9 @@ async def get_image_metadata(
     responses={
         200: {"content": {"image/jpeg": {}, "image/png": {}}},
         404: {"model": ErrorResponse, "description": "Image not found"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
+    dependencies=[Depends(check_rate_limit)],
 )
 async def download_image(
     image_id: str,
@@ -301,7 +305,9 @@ async def download_image(
     responses={
         200: {"content": {"image/jpeg": {}}},
         404: {"model": ErrorResponse, "description": "Image or thumbnail not found"},
+        429: {"model": ErrorResponse, "description": "Rate limit exceeded"},
     },
+    dependencies=[Depends(check_rate_limit)],
 )
 async def get_thumbnail(
     image_id: str,

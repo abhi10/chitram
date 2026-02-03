@@ -48,9 +48,10 @@ class RateLimiter:
         """Check if rate limiting is enabled."""
         return self._enabled and self._client is not None
 
-    def _allowed_result(self) -> RateLimitResult:
+    def _allowed_result(self, limit: int | None = None) -> RateLimitResult:
         """Return a result that allows the request."""
-        return RateLimitResult(True, 0, self._limit, self._limit)
+        lim = limit or self._limit
+        return RateLimitResult(True, 0, lim, lim)
 
     async def check(self, identifier: str) -> RateLimitResult:
         """Check if request from identifier is allowed."""
@@ -83,6 +84,96 @@ class RateLimiter:
         except RedisError as e:
             logger.warning(f"Rate limiter Redis error, allowing request: {e}")
             return self._allowed_result()
+
+    async def check_auth(
+        self,
+        ip: str,
+        email: str | None = None,
+    ) -> RateLimitResult:
+        """
+        Check auth-specific rate limits (stricter than general rate limit).
+
+        Implements dual rate limiting for auth endpoints:
+        - Per-IP: 20 requests per 5 minutes (prevents distributed attacks)
+        - Per-email: 5 requests per 5 minutes (prevents targeted brute force)
+
+        Args:
+            ip: Client IP address
+            email: Email address being used (optional for registration)
+
+        Returns:
+            RateLimitResult with the most restrictive limit applied
+        """
+        if not self.enabled:
+            return self._allowed_result(limit=settings.auth_rate_limit_per_email)
+
+        window = settings.auth_rate_limit_window_seconds
+
+        try:
+            # Check per-IP limit
+            ip_key = f"{self._key_prefix}:auth:ip:{ip}"
+            ip_limit = settings.auth_rate_limit_per_ip
+
+            async with self._client.pipeline(transaction=True) as pipe:
+                pipe.incr(ip_key)
+                pipe.expire(ip_key, window, nx=True)
+                pipe.ttl(ip_key)
+                ip_results = await pipe.execute()
+
+            ip_count, _, ip_ttl = ip_results[0], ip_results[1], ip_results[2]
+
+            if ip_count > ip_limit:
+                logger.warning(f"Auth rate limit (IP) exceeded for {ip}: {ip_count}/{ip_limit}")
+                return RateLimitResult(
+                    allowed=False,
+                    current_count=ip_count,
+                    limit=ip_limit,
+                    remaining=0,
+                    retry_after=ip_ttl if ip_ttl > 0 else window,
+                )
+
+            # Check per-email limit if email provided
+            if email:
+                email_key = f"{self._key_prefix}:auth:email:{email.lower()}"
+                email_limit = settings.auth_rate_limit_per_email
+
+                async with self._client.pipeline(transaction=True) as pipe:
+                    pipe.incr(email_key)
+                    pipe.expire(email_key, window, nx=True)
+                    pipe.ttl(email_key)
+                    email_results = await pipe.execute()
+
+                email_count, _, email_ttl = email_results[0], email_results[1], email_results[2]
+
+                if email_count > email_limit:
+                    logger.warning(
+                        f"Auth rate limit (email) exceeded for {email}: {email_count}/{email_limit}"
+                    )
+                    return RateLimitResult(
+                        allowed=False,
+                        current_count=email_count,
+                        limit=email_limit,
+                        remaining=0,
+                        retry_after=email_ttl if email_ttl > 0 else window,
+                    )
+
+                return RateLimitResult(
+                    True,
+                    email_count,
+                    email_limit,
+                    max(0, email_limit - email_count),
+                )
+
+            return RateLimitResult(
+                True,
+                ip_count,
+                ip_limit,
+                max(0, ip_limit - ip_count),
+            )
+
+        except RedisError as e:
+            logger.warning(f"Auth rate limiter Redis error, allowing request: {e}")
+            return self._allowed_result(limit=settings.auth_rate_limit_per_email)
 
 
 # Global rate limiter instance (initialized in main.py lifespan)

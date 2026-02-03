@@ -2,6 +2,9 @@
 
 This module handles server-rendered HTML pages using HTMX + Jinja2.
 All data access goes through ImageService for loose coupling.
+
+Security:
+- Rate limiting on gallery and image pages (prevents scraping)
 """
 
 from fastapi import APIRouter, Depends, Request
@@ -9,7 +12,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.dependencies import get_cache
-from app.api.images import get_storage
+from app.api.images import check_rate_limit, get_storage
 from app.api.tags import get_tag_service
 from app.config import get_settings
 from app.database import get_db
@@ -141,7 +144,7 @@ async def landing_page(
     )
 
 
-@router.get("/gallery", response_class=HTMLResponse)
+@router.get("/gallery", response_class=HTMLResponse, dependencies=[Depends(check_rate_limit)])
 async def gallery(
     request: Request,
     service: ImageService = Depends(get_image_service),
@@ -150,6 +153,7 @@ async def gallery(
     """
     User's personal gallery (requires authentication).
 
+    Rate limited to prevent scraping.
     This is the renamed home page - shows only the authenticated user's images
     per FR-4.1 unlisted model (no public listing).
     """
@@ -168,7 +172,9 @@ async def gallery(
     )
 
 
-@router.get("/image/{image_id}", response_class=HTMLResponse)
+@router.get(
+    "/image/{image_id}", response_class=HTMLResponse, dependencies=[Depends(check_rate_limit)]
+)
 async def image_detail(
     request: Request,
     image_id: str,
@@ -176,7 +182,7 @@ async def image_detail(
     tag_service: TagService = Depends(get_tag_service),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """Image detail page - Full image with metadata and tags."""
+    """Image detail page - Full image with metadata and tags. Rate limited."""
     image = await service.get_by_id(image_id)
     templates = get_templates(request)
 
@@ -286,13 +292,13 @@ async def auth_callback(
 # =============================================================================
 
 
-@router.get("/my-images", response_class=HTMLResponse)
+@router.get("/my-images", response_class=HTMLResponse, dependencies=[Depends(check_rate_limit)])
 async def my_images(
     request: Request,
     service: ImageService = Depends(get_image_service),
     user: User | None = Depends(get_current_user_from_cookie),
 ):
-    """My Images page - User's uploaded images (requires auth)."""
+    """My Images page - User's uploaded images (requires auth). Rate limited."""
     if not user:
         return RedirectResponse(url="/login", status_code=302)
 
@@ -311,7 +317,9 @@ async def my_images(
 # =============================================================================
 
 
-@router.get("/partials/gallery", response_class=HTMLResponse)
+@router.get(
+    "/partials/gallery", response_class=HTMLResponse, dependencies=[Depends(check_rate_limit)]
+)
 async def gallery_partial(
     request: Request,
     offset: int = 0,
@@ -321,7 +329,7 @@ async def gallery_partial(
 ):
     """Gallery partial - Load more images for HTMX infinite scroll.
 
-    Per FR-4.1: Only shows the authenticated user's images.
+    Rate limited. Per FR-4.1: Only shows the authenticated user's images.
     Returns empty if not authenticated.
     """
     if not user:
