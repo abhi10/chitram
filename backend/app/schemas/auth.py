@@ -6,10 +6,16 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class UserRegister(BaseModel):
-    """User registration request."""
+    """User registration request.
+
+    Security: Includes honeypot field for bot detection.
+    The 'website' field should always be empty - bots often fill hidden fields.
+    """
 
     email: EmailStr
     password: str = Field(..., min_length=8, max_length=128)
+    # Honeypot field - should be empty (hidden from real users)
+    website: str | None = Field(default=None, max_length=255)
 
 
 class UserLogin(BaseModel):

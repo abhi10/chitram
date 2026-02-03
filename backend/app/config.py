@@ -53,6 +53,15 @@ class Settings(BaseSettings):
     rate_limit_per_minute: int = 10
     rate_limit_window_seconds: int = 60  # 1 minute window
 
+    # Auth Rate Limiting (stricter for security)
+    auth_rate_limit_per_email: int = 5  # Max login attempts per email
+    auth_rate_limit_per_ip: int = 20  # Max auth requests per IP
+    auth_rate_limit_window_seconds: int = 300  # 5 minute window
+
+    # Account Lockout (brute force protection)
+    max_failed_login_attempts: int = 5  # Lock after N consecutive failures
+    account_lockout_minutes: int = 15  # Lockout duration
+
     # Concurrency Control (ADR-0010)
     upload_concurrency_limit: int = 10  # Max simultaneous uploads
     upload_concurrency_timeout: float = 30.0  # Seconds to wait for semaphore

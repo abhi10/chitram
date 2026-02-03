@@ -22,6 +22,9 @@ class AuthErrorCode(str, Enum):
     PROVIDER_ERROR = "PROVIDER_ERROR"
     WEAK_PASSWORD = "WEAK_PASSWORD"
     INVALID_EMAIL = "INVALID_EMAIL"
+    ACCOUNT_LOCKED = "ACCOUNT_LOCKED"  # Brute force protection
+    RATE_LIMITED = "RATE_LIMITED"  # Auth rate limit exceeded
+    HONEYPOT_TRIGGERED = "HONEYPOT_TRIGGERED"  # Bot detection
 
 
 @dataclass(frozen=True)

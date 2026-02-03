@@ -2,7 +2,7 @@
 
 from datetime import UTC, datetime
 
-from sqlalchemy import Boolean, DateTime, String
+from sqlalchemy import Boolean, DateTime, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.database import Base
@@ -19,6 +19,10 @@ class User(Base):
 
     Supports both local auth (password_hash) and external providers (supabase_id).
     For Supabase users, password_hash may be None as auth is handled externally.
+
+    Security fields:
+    - failed_login_attempts: Counter for consecutive failed logins (brute force protection)
+    - locked_until: Timestamp when lockout expires (15 min after 5 failed attempts)
     """
 
     __tablename__ = "users"
@@ -41,6 +45,18 @@ class User(Base):
     supabase_id: Mapped[str | None] = mapped_column(
         String(36), unique=True, nullable=True, index=True
     )
+
+    # Security: Brute force protection (Phase Security)
+    failed_login_attempts: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, server_default="0"
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+    def is_locked(self) -> bool:
+        """Check if account is currently locked due to failed login attempts."""
+        if self.locked_until is None:
+            return False
+        return datetime.now(UTC) < self.locked_until
 
     def __repr__(self) -> str:
         return f"<User(id={self.id}, email={self.email})>"

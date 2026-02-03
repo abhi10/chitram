@@ -2,9 +2,16 @@
 
 This module provides the auth API using the pluggable AuthProvider interface.
 The actual provider (local, supabase, etc.) is determined by configuration.
+
+Security features:
+- Per-IP and per-email rate limiting on login/register (5 attempts/5min per email)
+- Honeypot field detection on registration (bot protection)
+- Account lockout after failed login attempts (handled by auth provider)
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+import logging
+
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -20,12 +27,64 @@ from app.schemas.auth import (
     UserRegister,
     UserResponse,
 )
-from app.schemas.error import ErrorDetail
-from app.services.auth import AuthError, AuthProvider, create_auth_provider
+from app.schemas.error import ErrorCodes, ErrorDetail
+from app.services.auth import AuthError, AuthErrorCode, AuthProvider, create_auth_provider
+from app.services.rate_limiter import RateLimiter
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/v1/auth/token", auto_error=False)
+
+
+def get_rate_limiter(request: Request) -> RateLimiter | None:
+    """Dependency to get rate limiter from app state."""
+    return getattr(request.app.state, "rate_limiter", None)
+
+
+def get_client_ip(request: Request) -> str:
+    """Extract client IP from request (supports reverse proxy)."""
+    forwarded = request.headers.get("X-Forwarded-For")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+async def check_auth_rate_limit(
+    request: Request,
+    email: str | None = None,
+    rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
+) -> None:
+    """
+    Check auth-specific rate limits (stricter than general limits).
+
+    Enforces:
+    - Per-IP: 20 requests per 5 minutes
+    - Per-email: 5 requests per 5 minutes (if email provided)
+
+    Raises HTTPException 429 if limit exceeded.
+    """
+    if not rate_limiter or not rate_limiter.enabled:
+        return
+
+    client_ip = get_client_ip(request)
+    result = await rate_limiter.check_auth(ip=client_ip, email=email)
+
+    if not result.allowed:
+        logger.warning(f"Auth rate limit exceeded - IP: {client_ip}, Email: {email or 'N/A'}")
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=ErrorDetail(
+                code=ErrorCodes.RATE_LIMIT_EXCEEDED,
+                message=f"Too many attempts. Try again in {result.retry_after} seconds.",
+                details={
+                    "limit": result.limit,
+                    "retry_after": result.retry_after,
+                },
+            ).model_dump(),
+            headers={"Retry-After": str(result.retry_after)},
+        )
 
 
 def get_auth_provider(db: AsyncSession = Depends(get_db)) -> AuthProvider:
@@ -73,11 +132,34 @@ async def require_current_user(
 
 @router.post("/register", response_model=AuthResponse, status_code=status.HTTP_201_CREATED)
 async def register(
+    request: Request,
     data: UserRegister,
     provider: AuthProvider = Depends(get_auth_provider),
     db: AsyncSession = Depends(get_db),
+    rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
 ) -> AuthResponse:
-    """Register a new user account."""
+    """Register a new user account.
+
+    Security:
+    - Rate limited: 20 requests/5min per IP, 5 requests/5min per email
+    - Honeypot field detection (rejects if 'website' field is filled)
+    """
+    # Check rate limit first
+    await check_auth_rate_limit(request, email=data.email, rate_limiter=rate_limiter)
+
+    # Honeypot check - bots often fill hidden fields
+    if data.website:
+        logger.warning(
+            f"Honeypot triggered for registration: {data.email} from {get_client_ip(request)}"
+        )
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=ErrorDetail(
+                code="INVALID_REQUEST",
+                message="Registration failed. Please try again.",
+            ).model_dump(),
+        )
+
     result = await provider.register(data.email, data.password)
 
     if isinstance(result, AuthError):
@@ -123,14 +205,30 @@ async def register(
 
 @router.post("/login", response_model=AuthResponse)
 async def login(
+    request: Request,
     data: UserLogin,
     provider: AuthProvider = Depends(get_auth_provider),
     db: AsyncSession = Depends(get_db),
+    rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
 ) -> AuthResponse:
-    """Login with email and password."""
+    """Login with email and password.
+
+    Security:
+    - Rate limited: 20 requests/5min per IP, 5 requests/5min per email
+    - Account lockout after 5 failed attempts (15 min cooldown)
+    """
+    # Check rate limit first
+    await check_auth_rate_limit(request, email=data.email, rate_limiter=rate_limiter)
+
     result = await provider.login(data.email, data.password)
 
     if isinstance(result, AuthError):
+        # Map ACCOUNT_LOCKED to 429 (rate limit) for consistent client handling
+        if result.code == AuthErrorCode.ACCOUNT_LOCKED:
+            raise HTTPException(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                detail=result.to_dict(),
+            )
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=result.to_dict(),
@@ -162,10 +260,19 @@ async def login(
 
 @router.post("/token", response_model=Token)
 async def login_for_token(
+    request: Request,
     form_data: OAuth2PasswordRequestForm = Depends(),
     provider: AuthProvider = Depends(get_auth_provider),
+    rate_limiter: RateLimiter | None = Depends(get_rate_limiter),
 ) -> Token:
-    """OAuth2 compatible token endpoint for Swagger UI."""
+    """OAuth2 compatible token endpoint for Swagger UI.
+
+    Security:
+    - Rate limited: 20 requests/5min per IP, 5 requests/5min per email
+    """
+    # Check rate limit
+    await check_auth_rate_limit(request, email=form_data.username, rate_limiter=rate_limiter)
+
     result = await provider.login(form_data.username, form_data.password)
 
     if isinstance(result, AuthError):

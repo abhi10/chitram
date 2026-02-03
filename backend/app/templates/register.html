@@ -67,6 +67,18 @@
             >
         </div>
 
+        <!-- Honeypot field - hidden from real users, bots will fill it -->
+        <div style="position: absolute; left: -9999px;" aria-hidden="true">
+            <label for="website">Website (leave empty)</label>
+            <input
+                type="text"
+                id="website"
+                name="website"
+                tabindex="-1"
+                autocomplete="off"
+            >
+        </div>
+
         <!-- Error Message -->
         <div id="error-message" class="hidden mb-4 p-3 bg-red-50 border border-red-200 text-red-700 rounded-lg text-sm">
         </div>
@@ -146,6 +158,7 @@
         const email = document.getElementById('email').value;
         const password = document.getElementById('password').value;
         const confirmPassword = document.getElementById('confirm-password').value;
+        const website = document.getElementById('website').value;  // Honeypot
 
         // Client-side validation
         if (password !== confirmPassword) {
@@ -165,12 +178,16 @@
         errorMessage.classList.add('hidden');
 
         try {
+            // Include honeypot field - server will reject if filled
+            const payload = { email, password };
+            if (website) payload.website = website;
+
             const response = await fetch('/api/v1/auth/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ email, password }),
+                body: JSON.stringify(payload),
             });
 
             const data = await response.json();
